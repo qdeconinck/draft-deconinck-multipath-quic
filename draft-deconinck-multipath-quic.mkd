@@ -727,6 +727,38 @@ The following state is maintained for a given path.
       packet scheduling decisions and flow control management.
 
 
+Scheduling Strategies
+---------------------
+
+The current QUIC design {{I-D.itef-quic-transport}} offers a
+two-dimensional scheduling space, i.e., which frames will be packed
+inside a given packet. With the use of multiple paths, a third
+dimension is added, i.e., the path on which the packet will be sent.
+This dimension can have non negligible impact on the operations of
+Multipath QUIC, especially if the available paths exhibit very
+different network characteristics.
+
+The progression of the data flow depends on the reception of the
+MAX_DATA and MAX_STREAM_DATA frames. Those frames SHOULD be duplicated
+on several or all paths in use. This would limit the head-of-line
+blocking issue due to the transmission of the frames over a slow path.
+
+The path on which ACK frames are sent impacts the peer. The ACK frame
+is notably used to determine the latency of a path. If the ACK frame is
+sent on the path it acknowledges, then the peer can compute the
+round-trip-time of the path. Otherwise, the peer would compute the
+latency as the sum of the foward delay of the acknowledged path and
+the return delay of the path the ACK frame has been sent. Choosing
+between acknowledging packets on the same path or on a specific path is
+up to the implementation. However, hosts SHOULD have a consistent
+acknowledgement strategy. Selecting a random path to acknowledge
+packets will possibly increase the variability of the latency
+estimation, especially if paths exhibit very different network
+characteristics. Unlike MAX_DATA and MAX_STREAM_DATA, ACK frames SHOULD
+NOT be systematically duplicated on several paths as it can induce a
+large network overhead.
+
+
 Modifications to QUIC frames
 ============================
 
