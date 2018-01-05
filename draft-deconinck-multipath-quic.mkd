@@ -36,6 +36,10 @@ informative:
   RFC6356:
   RFC6824:
   RFC8041:
+  PR1012:
+     title: "A more complete connection migration"
+     date: "2017"
+     seriesinfo: "https://github.com/quicwg/base-drafts/pull/1012"
   Cellnet:
      title: "Exploring Mobile/WiFi Handover with Multipath TCP"
      date: "2012"
@@ -452,15 +456,15 @@ negotiated. Although a path can be first used by any host, it might not
 be practical for one of the peers to start using new paths. A possible
 cause is when a server wants to initiate the usage of a new path to a
 NAT'd client. The client would possibly not receive the packet, leading
-to connectivity issues on that path. To detect such issues, the PATHS
-frame provides a list of the currently active paths of the sending hosts
-to the peer. A path is called active when a functional network 4-tuple
-(on which either packets were sent or received on it or host received
-acknowledgments for packets over that path) is assigned to it.
-Furthermore, the PATHS frame indicates which 4-tuple the path is
-currently using. It also contains some path status metrics such as the
-round-trip-time estimated by the sending host over a given path in
-order to provide a global view of the path performance.
+to connectivity issues on that path. To avoid such issues, a remote
+address MUST have been validated before sending packets on a path using
+it. In addition, the PATHS frame provides a list of the currently
+active paths of the sending hosts to the peer. A path is called active
+when a validated network 4-tuple (with packets sent and acknowledged)
+is  assigned to it. Furthermore, the PATHS frame indicates which
+4-tuple the path is currently using, and thus helps in detecting if a
+peer changed its sending address on purpose (explicit migration) or not
+(NAT rebinding).
 
 
 Communicating New Addresses
@@ -476,9 +480,11 @@ This is possible with the ADD_ADDRESS frames that are sent by a
 Multipath QUIC host to advertise its current addresses. Each advertised
 address has an Address ID given by the sending host. The addresses
 assigned to a host can vary during the lifetime of a Multipath QUIC
-connection. A new ADD_ADDRESS frame is transmitted when a host has a new
-address. This ADD_ADDRESS frame is protected as other QUIC control
-frames, which implies that it cannot be spoofed by attackers.
+connection. A new ADD_ADDRESS frame is transmitted when a host has a
+new address. This ADD_ADDRESS frame is protected as other QUIC control
+frames, which implies that it cannot be spoofed by attackers. However,
+an host receiving an ADD_ADDRESS must first validate that the
+advertised address actually belongs to the peer.
 
 
 Path Migration
@@ -653,6 +659,32 @@ an host reusing Packet Number across paths must limit the number of
 advertised paths depending on the size of the Initial Value. In
 particular, an host MUST NOT advertise a max_path_id whose field length
 exceeds (Initial Value Length) - 8.
+
+
+Coping with Additional Remote Addresses
+---------------------------------------
+
+The usage of multiple networks paths if often done using multiple IP
+addresses. For instance, a smartphone willing to use both WiFi and LTE
+will use the corresponding addresses provided by the networks. It can
+then safely send packets to a previously-used IP address of a server.
+The server can receive packets with different IPs, but it MUST first
+validate the new remote IP addresses before starting sending packets to
+those addresses.
+
+The main reason for this validation is that the client might have sent,
+purposely or not, a packet with a source IP that does not correspond to
+the IP of the interface. This could lead to amplification attacks where
+the client start using a new path with a source IP corresponding to the
+victim's one. Without validation, the server might then flood the
+victim. This validation is also applicable for advertised addresses in
+ADD_ADDRESS frames. For instance, a malicious server might advertise
+the IP address of a victim, hoping that the client will use it without
+validating it before.
+
+The validation of an address could be performed with PATH_CHALLENGE and
+PATH_RESPONSE frames as described in {{PR1012}}. A validated address
+could be cached for a given for a limited amount of time.
 
 
 Path State
@@ -851,10 +883,12 @@ The ADD_ADDRESS frame contains the following fields:
       that a path can use the 2-tuple (IP addr, port).
 
 
-Upon reception of an ADD_ADDRESS frame, the receiver can use the
-communicated address to start the usage of a new path. Therefore, an
-ADD_ADDRESS frame SHOULD contain a global reachable address. Private
-and link-local addresses SHOULD NOT be exchanged.
+Upon reception of an ADD_ADDRESS frame, the receiver SHOULD store the
+communicated address for future use. The receiver MUST NOT send packets
+others than validation ones to the communicated address without having
+validated it. ADD_ADDRESS frames SHOULD contain global reachable
+addresses. Private and link-local addresses SHOULD NOT be exchanged.
+
 
 REMOVE_ADDRESS Frame
 --------------------
