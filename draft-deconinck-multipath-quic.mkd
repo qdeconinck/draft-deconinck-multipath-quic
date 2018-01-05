@@ -2,7 +2,7 @@
 title: Multipath Extension for QUIC
 abbrev: MP-QUIC
 docname: draft-deconinck-multipath-quic-01
-date: 2017-01-04
+date: today
 category: std
 updates:
 
@@ -181,6 +181,15 @@ the QUIC documents {{I-D.ietf-quic-transport}}. In addition, we define:
   The cryptographic handshake is done on this path. It is identified
   by Path ID 0.
 
+
+Notational Conventions
+----------------------
+
+Packet and frame diagrams use the format described in Section 2.1 of
+{{I-D.ietf-quic-transport}}, with the following additional convention:
+
+x (j) ... Indicates that x uses the variable-length encoding in
+   {{variable-length-pid}}
 
 Overview
 ========
@@ -403,7 +412,7 @@ will contain monotonically increasing packet numbers. To ensure more
 flexibility and potentially to reduce the ACK block section of the ACK
 frame when aggregating bandwidth of paths exhibiting different network
 characteristics, each path keeps its own monotonically increasing
-Packet Number space. This potentially allows sending 2^32 * 2^64 packets
+Packet Number space. This potentially allows sending 2^32 * 2^62 packets
 on a QUIC connection since each path (with a Path ID encoded on 4 bytes)
 has its own packet number space.
 
@@ -600,8 +609,10 @@ a Path ID comprised between 0 and the negotiated maximum path ID
 inclusive. If one of the host does not provides the max_path_id
 transport parameter during the cryptographic handshake, the remote MUST
 assume a value of 0, leading to a single-path connection over the
-Initial Path. Packets with a Path ID greater than the negotiated
-maximum value MUST be ignored.
+Initial Path. NEW_CONNECTION_ID frames proposing a Path ID greater than
+the negotiated maximum value MUST trigger a CONNECTION_CLOSE frame
+describing this issue.
+
 
 ### Transport Parameter Definition {#tp-definition}
 
@@ -611,11 +622,37 @@ max_path_id (0x0020):
 
  :  The maximum path ID transport parameter indicates
     the number of paths in addition to the Initial Path that the host
-    is willing to use over the connection, encoded as an unsigned 8-bit
+    is willing to use over the connection, encoded as an unsigned 32-bit
     integer. This indicates that received packets with path ID larger
     than this limit will be dropped. The default value for this
     parameter is 0, meaning that an host omitting this transport
     parameter does not want to use multiple paths over the connection.
+
+
+Variable-Length Encoding of the Path ID {#variable-length-pid}
+---------------------------------------
+
+From the negotiated maximum path ID, hosts can infer the amount of bits
+required to encode the Path ID. If the maximum path ID is 255, only one
+byte suffices. Similarly, if one of the hosts wants a single-path
+connection, either by advertising a max_path_id of 0 or by omitting it,
+the Path ID field should not be present.
+
+| Negotiated Max Path ID Range | Path ID Field Length (Bytes) |
+|:-----------------------------|:-----------------------------|
+| 0                            | 0                            |
+| 1-255                        | 1                            |
+| 256-65535                    | 2                            |
+| 65536-4294967295             | 4                            |
+{: #vle-pid-table title="Summary of Path ID Encodings"}
+
+The proposed encoding is summarized in {{vle-pid-table}}.
+
+Because of security considerations described in {{nonce-considerations}},
+an host reusing Packet Number across paths must limit the number of
+advertised paths depending on the size of the Initial Value. In
+particular, an host MUST NOT advertise a max_path_id whose field length
+exceeds (Initial Value Length) - 8.
 
 
 Path State
@@ -685,7 +722,7 @@ The NEW_CONNECTION_ID is as follows:
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          Path ID (32)                         |
+|                          Path ID  (j)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -705,10 +742,10 @@ The NEW_CONNECTION_ID is as follows:
 {: #newconnectionid title="NEW_CONNECTION_ID adapted to Multipath QUIC"}
 
 Compared to the frame specified in {{I-D.ietf-quic-transport}}, a Path
-ID field of 4 bytes is prefixed to make the link between the Path ID and
-the Connection ID. This frame can be only sent by the server. Upon
-reception of the frame with a specified path ID, the client can start
-using the new path with the matching Connection ID.
+ID field of variable size is prefixed to make the link between the Path
+ID and the Connection ID. This frame can be only sent by the server.
+Upon reception of the frame with a specified path ID, the client can
+start using the new path with the matching Connection ID.
 
 An host MUST NOT start using a path if no related NEW_CONNECTION_ID
 frame have been received (at client side) or acknowledged (at server
@@ -734,23 +771,13 @@ particular path will follow the same mechanism as described in
 ACK Frame
 ---------
 
-This draft changes the type byte of the ACK frame. The new type is
-formatted as "0000111P", and is parsed as follows:
-
-o The "P" bit indicates the presence of the Path ID field in the ACK
-frame. If unset, the ACK frame relates to the default path (i.e., Path
-ID 0).
-
-o Other bits remain unchanged.
-
-This means that the type byte of the ACK frame is 0xe. The format of
-the modified ACK frame is shown below.
+The format of the modified ACK frame is shown below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                           Path ID (32)                        |
+|                           Path ID (j)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                    Largest Acknowledged (i)                 ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -764,8 +791,8 @@ the modified ACK frame is shown below.
 {: #ack_frame title="ACK Frame adapted to Multipath"}
 
 Compared to the ACK frame in the current QUIC design
-{{I-D.ietf-quic-transport}}, the ACK frame contains a Path ID field
-indicating to which path the acknowledged PSNs relate to.
+{{I-D.ietf-quic-transport}}, the ACK frame contains a variable size
+Path ID field indicating to which path the acknowledged PSNs relate to.
 
 Since frames are independent of packets, and the path notion relates to
 the packets, the ACK frames can be sent on any path, unlike Multipath
@@ -864,8 +891,8 @@ below.
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+
-|ActivePaths (8)|
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                        ActivePaths (j)                      ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                     Path Info Section (*)                   ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -885,14 +912,18 @@ The PATHS frame contains the following fields:
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-| Path ID 0 (8) |LocAddrID 0 (8)|
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         Path ID 0 (j)                       ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|LocAddrID 0 (8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                        RTT Path 0 (32)                        |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
                                ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-| Path ID N (8) |LocAddrID N (8)|
+|                         Path ID N (j)                       ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|LocAddrID N (8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                        RTT Path N (32)                        |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -940,11 +971,11 @@ nonce computation is now performed as follow. The nonce, N, is formed
 by combining the packet protection IV (either client_pp_iv_n or
 server_pp_iv_n) with the Path ID and the packet number. The 64 bits of
 the reconstructed QUIC packet number in network byte order is
-left-padded with zeros to the size of the IV. The 8 bits of the Path ID
-is right-padded with zeros to the size of the IV. The Path IV is
-computed as the exclusive OR of the padded Path ID and the IV. The
-exclusive OR of the padded packet number and the Path IV forms the AEAD
-nonce.
+left-padded with zeros to the size of the IV. The Path ID encoded in
+its variable-length format described in {{variable-length-pid}} is
+right-padded with zeros to the size of the IV. The Path IV is computed
+as the exclusive OR of the padded Path ID and the IV. The exclusive OR
+of the padded packet number and the Path IV forms the AEAD nonce.
 
 IANA Considerations
 ===================
@@ -973,5 +1004,6 @@ Since draft-deconinck-multipath-quic-00
 
 - Implicit Path ID notification using Connection ID and
   NEW_CONNECTION_ID frames
+- Variable-length encoding for Path ID
 - Updated text to match draft-ietf-quic-transport-08
 - Fixed various typos
