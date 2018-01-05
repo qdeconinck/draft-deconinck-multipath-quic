@@ -917,16 +917,12 @@ The PATHS frame contains the following fields:
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |LocAddrID 0 (8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                        RTT Path 0 (32)                        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
                                ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                         Path ID N (j)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |LocAddrID N (8)|
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                        RTT Path N (32)                        |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
++-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
 {: #path_info_section title="Path Info Section"}
 
@@ -939,13 +935,8 @@ The fields in the Path Info Section are:
       the path. It can be used by a peer to indicate that it migrates
       one of the path to another address.
 
-    o RTT Path: the RTT experienced by the sending host over the path
-      with the provided Path ID. The formatting is similar to the one
-      used for the ACK delay field in the ACK frame.
-
-The Path Info section currently contains the RTT of the sending host,
-but this section can be extended to provide additional information in
-order to get a global picture of the connection at both ends.
+The Path Info section only contains the Local Address ID so far, but
+this section can be extended later.
 
 
 Security Considerations
