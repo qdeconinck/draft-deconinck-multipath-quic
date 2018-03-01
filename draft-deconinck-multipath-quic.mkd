@@ -119,10 +119,7 @@ informative:
 
 --- abstract
 
-Multipath TCP has shown how a reliable transport protocol can efficiently use
-multiple paths for a given connection. We leverage the experience gained with
-Multipath TCP to propose simple extensions that enable QUIC to efficiently
-use multiple paths during the lifetime of a QUIC connection.
+REWRITE
 
 --- middle
 
@@ -132,40 +129,31 @@ Introduction
 Endhosts have evolved. Today's endhosts are equipped with several network
 interfaces and users expect to be able to seamlessly switch from one to
 another or use them simultaneously to aggregate bandwidth. During the last
-years, several multipath extensions to transport protocols have been
-proposed {{RFC6824}},{{MPRTP}},{{SCTPCMT}}. Multipath TCP {{RFC6824}} is the most
-mature one. It is already deployed on popular smartphones and for other
-use cases {{RFC8041}}.
+years, several multipath extensions to transport protocols have been proposed
+{{RFC6824}},{{MPRTP}},{{SCTPCMT}}. Multipath TCP {{RFC6824}} is the most
+mature one. It is already deployed on popular smartphones and for other use
+cases {{RFC8041}}.
 
 With regular TCP and UDP, all the packets that belong to a given flow contain
-the same 5-tuple that acts as an identifier for this flow. This prevents flows from
-using multiple paths. QUIC {{I-D.ietf-quic-transport}} does not use the 5-tuple as
-an implicit connection identifier. A QUIC flow
-is identified by its Connection ID. This enables flows to survive to
-events such as NAT rebinding or mobility cases where the IP address or
-the port of one of the communicating peer changes. This connection
-migration feature is key for QUIC to migrate a flow from one path to
-another. However, this path change is implicit and the current design {{I-D.ietf-quic-transport}}
-still assumes single-path flows. Seamless handovers between wireless
-networks on smartphones are one of the motivations for connection migration in
-QUIC. However, experience with Multipath TCP shows that the
-handover between different wireless networks is not an abrupt process
-{{Cellnet}},{{IETFJ}} . To support
-seamless handovers, it is important to be able to use two (or more) paths simultaneously
-during the handover.
+the same 5-tuple that acts as an identifier for this flow. This prevents flows
+from using multiple paths. QUIC {{I-D.ietf-quic-transport}} does not use the
+5-tuple as an implicit connection identifier. A QUIC flow is identified by its
+Connection ID. This enables flows to cope with events affecting the 5-tuple,
+such as NAT rebinding or IP address changes. This connection migration feature,
+now described in more details in {{PR1012}}, is key for QUIC to migrate a flow
+from one 5-tuple to another one. Such migration feature offers the opportunity
+to QUIC to use multiple paths. Usecases such as bandwidth aggregations or
+seamless network handovers would be applicable to QUIC, as they are now with
+Multipath TCP. A first performance evaluation of such use cases and a
+comparison between Multipath QUIC and Multipath TCP may be found in {{MPQUIC}}.
 
-Bringing Multipath to QUIC allows hosts to aggregate several networks
-while providing better handover support, and potentially opens new use
-cases. A detailed performance evaluation and a comparison between
-Multipath QUIC and Multipath TCP may be found in {{MPQUIC}}.
-
-In this draft, we leverage many of the lessons learned from the design of Multipath TCP
-and propose extensions to the current QUIC design to enable it to simultaneously
-use several paths. This document is organized as follows. It first
-provides an overview of the operation of Multipath QUIC. It then states
-changes required in the packet format and specifies the usage of
-multiple paths. It also defines new frames to perform multipath
-operations. Finally, it provides some security and IANA considerations.
+In this draft, we leverage many of the lessons learned from the design of
+Multipath TCP and comments received from the first version of this draft to
+propose extensions to the current QUIC design to enable it to simultaneously
+use several paths. This document is organized as follows. It first provides an
+overview of the operation of Multipath QUIC. It then states changes required
+in the current QUIC design {{I-D.ietf-quic-transport}} and specifies the usage
+of multiple paths. Finally, it provides some security and IANA considerations.
 
 
 Conventions and Definitions
@@ -179,7 +167,8 @@ We assume that the reader is familiar with the terminology used in
 the QUIC documents {{I-D.ietf-quic-transport}}. In addition, we define:
 
 - Path: A logical association between two hosts over which packets
-  can be sent. A path is identified by a Path ID.
+  can be sent. A path is internally identified by a Path ID and uses a
+  potentially changing Connection ID in packets belonging to that path.
 
 - Initial Path: The path used for the establishment of the QUIC connection.
   The cryptographic handshake is done on this path. It is identified
@@ -198,114 +187,56 @@ x (j) ... Indicates that x uses the variable-length encoding in
 Overview
 ========
 
-The current design of QUIC {{I-D.ietf-quic-transport}} provides reliable transport
-with multiplexing and security. A wide range of devices on today's
-Internet are multihomed. Examples include smartphones equipped
-with both WiFi and cellular interfaces, but also regular dual-stack
-hosts that use both IPv4 and IPv6. Experience with Multipath TCP has
-shown that the ability to combine different paths during the lifetime
-of a connection provides various benefits including bandwidth
-aggregation or seamless handovers {{RFC8041}},{{IETFJ}}.
+The current design of QUIC {{I-D.ietf-quic-transport}} provides reliable
+transport with multiplexing and security. A wide range of devices on today's
+Internet are multihomed. Examples include smartphones equipped with both WiFi
+and cellular interfaces, but also regular dual-stack hosts that use both IPv4
+and IPv6. Experience with Multipath TCP has shown that the ability to combine
+different paths during the lifetime of a connection provides various benefits
+including bandwidth aggregation or seamless handovers {{RFC8041}},{{IETFJ}}.
 
-The current design of QUIC does not enable multihomed devices to
-efficiently use different paths. We first explain why
-a multipath extension would be beneficial to QUIC and then
-describe it at a high level.
+The current design of QUIC does not enable multihomed devices to efficiently
+use different paths. We first explain why a multipath extension would be
+beneficial to QUIC and then describe it at a high level.
 
 What is a Path?
 ---------------
 
-Before going into details, let's first define what is called a "path".
-A path is a UDP flow between two hosts denoted by a 4-tuple
-(IP source address, IP destination address, source port, destination port).
-On a smartphone interacting with a single-homed server, the mobile
-device could decide to use one path over the WiFi network and another
-over the cellular one. Those paths are not necessarily
-completely disjoint. For example, when interacting with a
-dual-stack server, a smartphone may create two paths over the WiFi
-network, one over IPv4 and the other one over IPv6.
+Before going into details, let's first define what is called a "path". A path
+is a UDP flow between two hosts denoted by a 4-tuple (IP source address, IP
+destination address, source port, destination port). On a smartphone
+interacting with a single-homed server, the mobile device might want to use
+one path over the WiFi network and another over the cellular one. Those paths
+are not necessarily completely disjoint. For example, when interacting with a
+dual-stack server, a smartphone may create two paths over the WiFi network, one over IPv4 and the other one over IPv6.
 
 Going Further than Connection Migration
 ---------------------------------------
 
-Unlike TCP {{RFC0793}}, QUIC is not bound to a particular 4-tuple during
-the lifetime of a connection. A QUIC connection is identified by a Connection ID,
-placed in the public header of QUIC packets. This enables hosts to
-continue the connection even if the 4-tuple changed due to, e.g., NAT
-rebinding. This ability to shift a connection from one 4-tuple to
-another is called Connection Migration. Another of its use cases is
-fail-over when the address in use fails but
-another one is available. A mobile device loosing the WiFi connectivity
+Unlike TCP {{RFC0793}}, QUIC is not bound to a particular 4-tuple during the
+lifetime of a connection. A QUIC connection is identified by a Connection ID,
+placed in the public header of QUIC packets. This enables hosts to continue
+the connection even if the 4-tuple changed due to, e.g., NAT rebinding. This
+ability to shift a connection from one 4-tuple to another is called Connection
+Migration. Another of its use cases is fail-over when the address in use fails
+but another one is available. A mobile device loosing the WiFi connectivity
 can then continue the connection over its cellular interface.
 
-A QUIC connection can thus start on a given path and end on another
-one. However, the current QUIC design {{I-D.ietf-quic-transport}}
-assumes that only one path is in use for a given connection. This connection
-migration feature is not intended to support the simultaneous
-usage of multiple paths. To illustrate this point,
-consider the following scenario where a smartphone connected to both
-WiFi and LTE networks sends a POST request fitting in 2
-packets and receives a large response from the single-homed server.
-
-~~~~~~~~~~
-Server                        Phone                           Server
-via WiFi                                                     via LTE                                  
--------                      -------                          -----
-  |  Pkt(CID=A, PN=1, frames=[  |    
-  |   STREAM("Request (1/2)")]) | Pkt(CID=A, PN=2, frames=[     |  
-  |<----------------------------|  STREAM("Request (2/2)")])    |
-  |  Pkt(CID=A, PN=1, frames=[  |--------                       |
-  |   ACK(LargestAcked=1)])     |       |----------             |
-  |---------------------------->|                 |----------   |
-  |                             |                           |-->|
-  |                             |   Pkt(CID=A, PN=2, frames=[   |
-  |                             |    ACK(LargestAcked=2),       |
-  |                             |    STREAM("Response 1")]) ----|
-  |                             |                 ----------|   |
-  |                             |       ----------|             |
-  |                             |<------|                       |
-  |                             |    Pkt(CID=A, PN=3, frames=[  |
-  |                             |     ACK (LargestAcked=2)])    |
-  |                             |--------                       |
-  |                             |       |----------             |
-  |                             |                 |----------   |
-  |                             |                           |-->|
-  |                             |  Pkt(CID=A, PN=3, frames=[    |
-  |                             |   STREAM("Response 2")])      |
-  |                             |                           ----|
-  |                             |           ...   <---------|   |  
-
-~~~~~~~~~~
-{: #examplespquic title="Single-path QUIC with multiple paths"}
-
-Assume the client wants to aggregate all the network interfaces it has.
-It sends the first packet with the STREAM frame containing the
-beginning of the request on the WiFi interface. It then sends the second one
-on its LTE interface. If the WiFi network exhibits a lower latency than the LTE
-one, the server will first receive the packet from the WiFi network
-and acknowledge it by sending an ACK frame on the WiFi.
-Then, it receives the second packet from the LTE network. Thanks to
-the Connection ID (CID) in the public header of the QUIC
-packet, the server detects that this packet belongs to the same
-connection and performs a connection migration over this new 4-tuple.
-At this point, the connection remains stuck on the cellular network, unless the
-smartphone sends a new packet over the WiFi network. This is
-because there is currently no way for the server to know that the
-remote peer uses two different networks paths with potentially different
-properties. The smartphone might have sent the first response ACK frame on
-the WiFi to drift the connection towards the WiFi network, but the
-server would lose its ability to use the cellular one, and would
-possibly observe large RTT variance over the connection. The multipath
-extension of QUIC aims to achieve an efficient usage of multiple paths
-by making them explicit to peers.
-
-With the proposed multipath extension to QUIC, the example presented in
-{{examplespquic}} can become the one presented below.
+A QUIC connection can thus start on a given path and end on another one.
+However, the current QUIC design {{I-D.ietf-quic-transport}} assumes that only
+one path is in use for a given connection. Instead of switching the 4-tuple
+for the whole connection, this draft proposes to leverage the address
+validation process proposed in {{PR1012}} to verify if additional addresses
+advertised by the communicating host are available and actually belong to it.
+In such case, those addresses can be used to create new paths to spread packets
+over several networks. The example presented in {{examplempquic}} shows a
+possible data exchange between a dual-homed client performing a request fitting
+in two packets and a single-homed server.
 
 
 ~~~~~~~~~~
 Server                          Phone                          Server
-via WiFi                                                      via LTE                                  
+via WiFi                                                       via LTE
 -------                        -------                          -----
   | Pkt(CID=A,PN=1,frames=[       |                               |
   |  STREAM("Request (1/2)")])    | Pkt(CID=B,PN=1,frames=[       |
@@ -314,52 +245,48 @@ via WiFi                                                      via LTE
   |  ACK(PID=1,LargestAcked=1)])  |       |----------             |
   |------------------------------>|                 |----------   |
   | Pkt(CID=A,PN=2,frames=[       |                           |-->|
-  |  STREAM("Response 1")])       | Pkt(CIA=A,PN=1,frames=[       |
+  |  STREAM("Response 1")])       | Pkt(CID=B,PN=1,frames=[       |
   |------------------------------>|  ACK(PID=2,LargestAcked=1),   |
   |                               |  STREAM("Response 2")])   ----|
   | Pkt(CID=A,PN=2,frames=[       |                 ----------|   |
   |  ACK(PID=1, LargestAcked=2),  |       ----------|             |
   |  ACK(PID=2, LargestAcked=1)]) |<------|                       |
   |<------------------------------|                               |
-  | Pkt(CID=A,PN=3,frames=[       | Pkt(CIA=A,PN=2,frames=[       |
+  | Pkt(CID=A,PN=3,frames=[       | Pkt(CID=B,PN=2,frames=[       |
   |  STREAM("Response 3")])       |  STREAM("Response 4")])       |
   |------------------------------>|                           ----|
   |                               |                 ----------|   |
   |            ...                |  ...  <---------|             |
 ~~~~~~~~~~
-{: #examplempquic title="Dataflow with Multipath QUIC (explicit Path ID)"}
+{: #examplempquic title="Dataflow with Multipath QUIC"}
 
-With the notion of multiple paths explicitly advertised, the server is
-aware that multiple paths using different networks are present, and can
-potentially be used simultaneously since it knows the 4-tuple to use
-for each path. When the server receives the request that was carried
-over two different paths, it can then use both of them to transfer back
-the response to the client. The remaining of this section focuses on
-giving a high-level view of the multipath operations in QUIC.
+
+The remaining of this section focuses on providing a high-level view of the
+multipath operations in QUIC.
 
 Starting a Multipath QUIC Connection
 ------------------------------------
 
-Before using multiple paths, the QUIC connection must be established. A
-Multipath QUIC connection always starts over an initial path where the
-cryptographic handshake takes place over the dedicated stream with
-Stream ID 0. The establishment is thus performed as in the current QUIC
-design {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. The
-negotiation of multipath is performed during the cryptographic
-handshake with the max_path_id transport parameter, where both hosts
-advertise how many paths they are willing to use. The number of paths
-that can then be used over the connection once the handshake completes
-is the minimum between both advertised values. The path on which the
-cryptographic handshake and the path number negotiation are performed
-is called the Initial Path and is identified by the Path ID 0.
+A Multipath QUIC connection starts like a regular QUIC connection. A
+cryptographic handshake takes place over the dedicated stream with Stream ID 0
+and follows the classical process {{I-D.ietf-quic-transport}}
+{{I-D.ietf-quic-tls}}. It is during that process that the multipath capability
+is negotiated between hosts. This is performed using the max_path_id transport
+parameter, where both hosts advertise up to how many paths they are able to
+use over the connection. The negotiated value will determine on how many bytes
+the Path ID will be encoded in frames. If one of the hosts does not advertise
+the max_path_id transport parameter, the negotiated value is 0, meaning that
+the QUIC connection will remain single-path.
+
+The handshake will take place on a given path. This path is called the Initial
+path and is identified by the Path ID 0.
 
 Multipath QUIC Architecture
 ---------------------------
 
-Once the connection is established, QUIC can start to use as many paths
-as negotiated. A Multipath QUIC connection is composed of several
-paths. Each path is associated with a different four-tuple and
-identified by a Path ID, as shown in {{architectural}}.
+Once established, a Multipath QUIC connection is composed of one or several
+paths. Each path is associated with a different four-tuple and identified by a
+Path ID, as shown in {{architectural}}.
 
 ~~~~~~~~~~
           +---------------------------------------------+
@@ -374,163 +301,154 @@ identified by a Path ID, as shown in {{architectural}}.
 ~~~~~~~~~~
 {: #architectural title="Architectural view of Multipath QUIC"}
 
-A Multipath QUIC connection starts on the Initial Path, identified by
-Path ID 0. In Multipath QUIC, there are two levels of Connection IDs.
-The Master Connection ID (MCID) uniquely identifies the connection, as
-with the current QUIC design. The Path Connection ID (PCID) is specific
-to each path. Packets belonging to a given path share the same PCID
-written in the Connection ID field of the public header. The PCID acts
-as an implicit path identifier for packets. This makes the linkability
-of different paths harder than having explicit signaling. The PCID of
-the Initial path will typically be the MCID. This design simplifies the
-detection of packet losses on a per-path basis and enables a receiver
-to easily detect out-of-order packets on a given path. Hosts can also
-collect network information about each path, such as round-trip-time
-measurements and maintain a per-path congestion window.
+As described before, a Multipath QUIC connection starts on the Initial Path,
+identified by Path ID 0. For Multipath QUIC, this draft proposes two levels of
+Connection IDs. The first one is the Master Connection ID (MCID). It uniquely
+identifies the connection, as with the current QUIC design. The second one is
+the Path Connection ID (PCID). Packets belonging to a given path share the
+same PCID written in the Connection ID field of the public header. The PCID
+acts as an implicit path identifier for packets. This makes the linkability of
+different paths harder than having explicit signaling as in the first version
+of this draft. The MCID of a connection will be the PCID of the Initial Path.
+In the example shown in {{examplempquic}}, if the connection started on the
+WiFi network, then the Connection ID A is both the PCID of the WiFi path and
+the MCID of the connection.
 
-Exchanging Data over Multiple Paths
------------------------------------
-
-A QUIC packet acts as a container for one of more frames. Multipath
-QUIC uses the same STREAM frames as QUIC to carry data. A byte
-offset is associated to the data payload. One of the key design
-decision of (Multipath) QUIC is that frames are independent of the
-packets carrying them. This implies that a frame transmitted over
-one path could be retransmitted later on another path without any
-change.
-
-However, the path on which data is sent is a packet-level information.
-This means a frame can be sent regardless of the path of the
-packet carrying it. Furthermore, because the data offset is a
-frame-level information, there is no need to define additional sequence
-numbers to cope with reordering across paths, unlike Multipath TCP
-{{RFC6824}} that uses a Data Sequence Number at MPTCP level.
-Other flow control considerations like the stream receive window
-advertised by the MAX_STREAM_DATA frame remain unchanged when there
-are multiple paths.
-
-However, Multipath QUIC might face reordering at packet-level when
-using paths having different latencies. The presence of the Path
-ID in the public header ensures that the packets sent over a given path
-will contain monotonically increasing packet numbers. To ensure more
-flexibility and potentially to reduce the ACK block section of the ACK
-frame when aggregating bandwidth of paths exhibiting different network
-characteristics, each path keeps its own monotonically increasing
-Packet Number space. This potentially allows sending 2^32 * 2^62 packets
-on a QUIC connection since each path (with a Path ID encoded on 4 bytes)
-has its own packet number space.
-
-The ACK frame is also modified to allow per-path packet
-acknowledgments. This remains compliant with the design decision of the
-independence between packets and frames while providing more
-flexibility to hosts to decide on which path they want to send path
-acknowledgments. Looking again at {{examplempquic}}, packets that were
-sent over a given path (e.g., the response2 packet on path 2 with CID B)
-can be acknowledged on another path (here, path 1 with CID A) to limit
-the latency due to ACK transmissions on high-latency paths. Such
-scheduling decision would not have been possible in Multipath TCP
-{{RFC6824}} which must acknowledge data coming from a given path on the
-same path.
+In addition to the PCID, some additional information is kept for each path.
+The Path ID identifies the path at frame level and ensures uniqueness of the
+nonce (see {{nonce-considerations}} for details). A congestion window is
+maintained for each path. Hosts can also collect network measurements on a
+per-path basis, such as round-trip-time measurements and lost packets.
 
 
 Starting to Use Paths
 ---------------------
 
-The cryptographic handshake determines how many paths, in addition to
-the initial one, can be used. Once this handshake completes, hosts must
-agree on the Path Connection IDs of the available paths. The server
-sends NEW_CONNECTION_ID frames to propose PCID for a given Path ID.
-Once the client receives and acknowledges the frame, it can start using
-the new path by placing the PCID in the Connection ID field of the
-packets. The server can start using a path once the corresponding
-NEW_CONNECTION_ID have been acknowledged.
+The cryptographic handshake determines an upper bound on the number of paths
+that can be created over the connection, in addition to the Initial one. Then,
+hosts must agree on which paths can be used, and with which Path Connection
+IDs. Unlike Multipath TCP {{RFC6824}}, the server dynamically controls how many
+paths can currently be in use.
 
-The number of paths that can be used over a connection is controlled by
-the server and the NEW_CONNECTION_ID frames it sends. To limit the
-latency of the path handshake, the server can send those frames just
-after the 0-RTT handshake packet.
+The server proposes new paths with an extended version of the
+NEW_CONNECTION_ID frame (see {{newconnectionid}}). That frame proposes a PCID
+for a given Path ID. Once the client receives and acknowledges the frame, it
+can start using the new path by placing the PCID in the Connection ID field of
+the packets. The server can start using a path once the corresponding
+NEW_CONNECTION_ID has been acknowledged.
 
-Multipath QUIC is fully symmetrical. Both the client and the server can
-start using new paths once their corresponding PCID have been
-negotiated. Although a path can be first used by any host, it might not
-be practical for one of the peers to start using new paths. A possible
-cause is when a server wants to initiate the usage of a new path to a
-NAT'd client. The client would possibly not receive the packet, leading
-to connectivity issues on that path. To avoid such issues, a remote
-address MUST have been validated before sending packets on a path using
-it. In addition, the PATHS frame provides a list of the currently
-active paths of the sending hosts to the peer. A path is called active
-when a validated network 4-tuple (with packets sent and acknowledged)
-is  assigned to it. Furthermore, the PATHS frame indicates which
-4-tuple the path is currently using, and thus helps in detecting if a
-peer changed its sending address on purpose (explicit migration) or not
-(NAT rebinding).
+The client is not able to create new paths as long as the server does not send
+NEW_CONNECTION_ID frames. To limit the latency of the path handshake, the
+server can send those frames just after the 0-RTT handshake packet.
+
+Multipath QUIC is fully symmetrical. Both the client and the server can start
+using new paths once their corresponding PCID have been negotiated. Although a
+path can be first used by any host, it might not be practical for one of the
+peers to start using new paths. A possible cause is when a server wants to
+initiate the usage of a new path to a NAT'd client. The client would possibly
+not receive the packet, leading to connectivity issues on that path. To avoid
+such issues, a remote address MUST have been validated as described in
+{{PR1012}} before sending packets on a path using it.
+
+
+Exchanging Data over Multiple Paths
+-----------------------------------
+
+A QUIC packet acts as a container for one of more frames. Multipath QUIC uses
+the same STREAM frames as QUIC to carry data. A byte offset is associated to
+the data payload. One of the key design decision of (Multipath) QUIC is that
+frames are independent of the packets carrying them. This implies that a frame
+transmitted over one path could be retransmitted later on another path without
+any change.
+
+The path on which data is sent is a packet-level information. This means a
+frame can be sent regardless of the path of the packet carrying it.
+Furthermore, because the data offset is a frame-level information, there is no
+need to define additional sequence numbers to cope with reordering across
+paths, unlike Multipath TCP {{RFC6824}} that uses a Data Sequence Number at
+MPTCP level. Other flow control considerations like the stream receive window
+advertised by the MAX_STREAM_DATA frame remain unchanged when there are
+multiple paths.
+
+However, Multipath QUIC might face reordering at packet-level when using paths
+having different latencies. The presence of the Path ID in the public header
+ensures that the packets sent over a given path will contain monotonically
+increasing packet numbers. To ensure more flexibility and potentially to
+reduce the ACK block section of the ACK frame when aggregating bandwidth of
+paths exhibiting different network characteristics, each path keeps its own
+monotonically increasing Packet Number space. This potentially allows sending
+2^32 * 2^62 packets on a QUIC connection since each path (with a Path ID
+encoded on 4 bytes) has its own packet number space.
+
+The ACK frame is also modified to allow per-path packet acknowledgments. This
+remains compliant with the design decision of the independence between packets
+and frames while providing more flexibility to hosts to decide on which path
+they want to send path acknowledgments. Looking again at {{examplempquic}},
+packets that were sent over a given path (e.g., the response2 packet on path 2
+with CID B) can be acknowledged on another path (here, path 1 with CID A) to
+limit the latency due to ACK transmissions on high-latency paths. Such
+scheduling decision would not have been possible in Multipath TCP {{RFC6824}}
+which must acknowledge data coming from a given path on the same path.
 
 
 Communicating New Addresses
 ---------------------------
 
-When a multi-homed mobile device connects to a dual-stacked server on
-its IPv4 address, it is aware of its local addresses (e.g., the WiFi
-and the cellular ones) and the IPv4 remote address used to establish
-connection. If the client wants to create new paths over IPv6,
-it needs to learn the other addresses of the remote peer.
+When a multi-homed mobile device connects to a dual-stacked server on its IPv4
+address, it is aware of its local addresses (e.g., the WiFi and the cellular
+ones) and the IPv4 remote address used to establish connection. If the client
+wants to create new paths over IPv6, it needs to learn the other addresses of
+the remote peer.
 
-This is possible with the ADD_ADDRESS frames that are sent by a
-Multipath QUIC host to advertise its current addresses. Each advertised
-address has an Address ID given by the sending host. The addresses
-assigned to a host can vary during the lifetime of a Multipath QUIC
-connection. A new ADD_ADDRESS frame is transmitted when a host has a
-new address. This ADD_ADDRESS frame is protected as other QUIC control
-frames, which implies that it cannot be spoofed by attackers. However,
-an host receiving an ADD_ADDRESS must first validate that the
-advertised address actually belongs to the peer.
+This is possible with the ADD_ADDRESS frames that are sent by a Multipath QUIC
+host to advertise its current addresses. Each advertised address has an
+Address ID given by the sending host. The addresses assigned to a host can
+vary during the lifetime of a Multipath QUIC connection. A new ADD_ADDRESS
+frame is transmitted when a host has a new address. This ADD_ADDRESS frame is
+protected as other QUIC control frames, which implies that it cannot be
+spoofed by attackers. However, an host receiving an ADD_ADDRESS must first
+validate that the advertised address actually belongs to the peer before
+starting to use it.
+
+If the client is NAT'd, it might be possible to have a private address in an
+ADD_ADDRESS frame. In such situations, the server would not be able to
+validate the communicated address. The client might still use its NAT'd address
+to start a new path. To enable the server to make the link between the private
+and the public addresses, Multipath QUIC provides the PATHS frame that lists
+current active Path IDs of the sending host. A path is called active when it
+was created over a validated network 4-tuple and is still in use. The frame
+indicates the local Address ID that the path uses. With this information, the
+server can then validate the public address and make the link between the
+advertised and the perceived addresses.
 
 
 Path Migration
 --------------
 
 At a given time, a Multipath QUIC connection gathers a set of paths,
-each denoted by a 4-tuple. The 4-tuple that is associated to
-a path is not fixed. It may change during the lifetime of a
-connection. Those changes can be caused by NAT rebindings
-or handovers for example.
+each denoted by a 4-tuple. To address privacy issues due to the
+linkability of addresses with Connection IDs, a path should not change
+the 4-tuple it uses. However, there are two main causes that might
+change the 4-tuple used by an host: host-unaware change (e.g., NAT
+rebinding) and host-aware change (e.g., network handover from WiFi to cellular). For each case, a mechanism is proposed.
 
-~~~~~~~~~~
-                                                                 Host
-                                                                 ----
-UDP(sIP= 192.0.2.0, dIP=198.51.100.0, sport=S, dport=D, payload=   |
-    QUICPkt(CID=A, PN=X))                                          |
-        -------------------------------------------------------->  |
-                                                                   |
-UDP(sIP= 198.51.100.0, dIP=192.0.2.0, sport=D, dport=S, payload=   |
-    QUICPkt(CID=A, PN=Y))                                          |
-        <--------------------------------------------------------  |
-                                                                   |
-UDP(sIP= 203.0.113.0, dIP=198.51.100.0, sport=T, dport=D, payload= |
-    QUICPkt(CID=A, PN=X+1))                                        |
-        -------------------------------------------------------->  |
-                                                                   |
-UDP(sIP= 198.51.100.0, dIP=203.0.113.0, sport=D, dport=T, payload= |
-    QUICPkt(CID=A, PN=Y+1))                                        |
-        <--------------------------------------------------------  |
-                                                                   |
-~~~~~~~~~~
-{: #path_migration title="Example of path migration (explicit Path ID)"}
+In case of host-unaware change, hosts must ensure that the new 4-tuple
+actually belongs to the remote. [TODO ADD REF TO PR]. Once the new
+address has been validated, the server can send a NEW_CONNECTION_ID
+frame with the MIGRATE flag set. It contains two Path IDs: the
+previously used one and a new one. Upon reception of this frame, the
+client MUST stop using the previously used path and can start using the
+new one with the same perceived 4-tuple.
 
-{{path_migration}} shows an example of path whose 4-tuple changes
-during the connection. Initially, from the host perspective, the path
-is using the 4-tuple (198.51.100.0, 192.0.2.0, D, S). The first packet
-it receives still uses it and the host uses that 4-tuple to generate
-the next packet on that path. Then, host receives a packet on the path
-with a different 4-tuple (198.51.100.0, 203.0.113.0, D, T), with both
-changed remote IP and port. Because the QUIC packet contains both the
-Connection ID and the Path ID it belongs to, host can simply adapt the
-path 4-tuple to the one of the last packet received, and next packets
-on the path will use that 4-tuple. Because the Connection ID is its
-only identifier, a path is not bound to a particular 4-tuple, and can
-shift to another one. Multipath QUIC thus integrates the Connection
-Migration ability at path level, providing the Path Migration ability.
+In case of host-aware change...
+
+TODO: IDEA OF NEW_CONNECTION_ID WITH MIGRATE FLAG
+This provides server with full control about the path resources, can fit both
+NAT rebinding and handover cases.
+
+//TODO: Address/network loss = PATHS + REMOVE_ADDRESS frame (stop sending)
+//Privacy concern = MIGRATE_PATH
+Content: Old Path ID, New Path ID
 
 
 Coping with Address Removals
@@ -622,6 +540,7 @@ describing this issue.
 
 ### Transport Parameter Definition {#tp-definition}
 
+TODO: desired_active_paths?
 An endhost MAY use the following transport parameter:
 
 max_path_id (0x0020):
@@ -730,7 +649,7 @@ The following state is maintained for a given path.
 Scheduling Strategies
 ---------------------
 
-The current QUIC design {{I-D.itef-quic-transport}} offers a
+The current QUIC design {{I-D.ietf-quic-transport}} offers a
 two-dimensional scheduling space, i.e., which frames will be packed
 inside a given packet. With the use of multiple paths, a third
 dimension is added, i.e., the path on which the packet will be sent.
@@ -771,7 +690,7 @@ packet-level information with the Largest Acknowledged field. Since the
 Packet Number are now linked to paths, the ACK frame must contain the
 Path ID it acknowledges.
 
-NEW_CONNECTION_ID Frame
+NEW_CONNECTION_ID Frame {# newconnectionid}
 -----------------------
 
 The NEW_CONNECTION_ID frame (type=0x0b) as defined by {{I-D.ietf-quic-transport}}
@@ -1059,8 +978,8 @@ Change Log
 Since draft-deconinck-multipath-quic-00
 -------------------------------
 
-- Implicit Path ID notification using Connection ID and
-  NEW_CONNECTION_ID frames
+- Implicit Path ID notification using Connection ID and NEW_CONNECTION_ID   
+  frames
 - Variable-length encoding for Path ID
-- Updated text to match draft-ietf-quic-transport-08
+- Updated text to match draft-ietf-quic-transport-09
 - Fixed various typos
