@@ -646,7 +646,8 @@ state. The possible path states are depicted in {{path_state}}.
 +----------+
 | MIGRATED |
 +----------+
-{: #path_state="Finite-State Machine of paths"}
+~~~~~~~~~~
+{: #path_state title="Finite-State Machine of paths"}
 
 Once a path has been proposed in a NEW_CONNECTION_ID frame, it is in PROPOSED
 state. In this situation, hosts MUST keep the following path information:
