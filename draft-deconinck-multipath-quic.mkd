@@ -328,26 +328,37 @@ The cryptographic handshake determines an upper bound on the number of paths
 that can be created over the connection, in addition to the Initial one. Then,
 hosts must agree on which paths can be used, and with which Path Connection
 IDs. Unlike Multipath TCP {{RFC6824}}, the server dynamically controls how many
-paths can currently be in use.
+paths can currently be in use. This can be done using a new MAX_PATHS frame
+indicating how many additional paths can be simultaneously in use.
 
 The server proposes new paths with an extended version of the
 NEW_CONNECTION_ID frame (see {{newconnectionid}}). That frame proposes a PCID
 for a given Path ID. Once the client receives and acknowledges the frame, it
 can start using the new path by placing the PCID in the Connection ID field of
 the packets. The server can start using a path once the corresponding
-NEW_CONNECTION_ID has been acknowledged.
+NEW_CONNECTION_ID has been acknowledged. Both hosts keep the NEW_CONNECTION_ID
+information in order to cope with the remote trying to use a new path.
+
+A server might provide more Path IDs with NEW_CONNECTION_ID frames than the
+value advertised in the MAX_PATHS frame. This can be useful for migration
+cases, as described in {{path-migration}}. In such cases, the client MUST NOT
+initiate more paths than the number advertised in the last MAX_PATHS frame.
+Multipath QUIC is fully symmetrical. Both the client and the server can start
+using new paths once their corresponding PCID have been negotiated. It might
+happen that both hosts try to create paths with different Path IDs, such that
+there are more paths than the advertised number in MAX_PATHS frame. In that
+case, hosts will keep paths with the lowest Path IDs.
 
 The client is not able to create new paths as long as the server does not send
-NEW_CONNECTION_ID frames. To limit the latency of the path handshake, the
-server can send those frames just after the 0-RTT handshake packet.
+NEW_CONNECTION_ID and MAX_PATHS frames. To limit the latency of the path
+handshake, the server can send those frames just after the 0-RTT handshake
+packet.
 
-Multipath QUIC is fully symmetrical. Both the client and the server can start
-using new paths once their corresponding PCID have been negotiated. Although a
-path can be first used by any host, it might not be practical for one of the
-peers to start using new paths. A possible cause is when a server wants to
-initiate the usage of a new path to a NAT'd client. The client would possibly
-not receive the packet, leading to connectivity issues on that path. To avoid
-such issues, a remote address MUST have been validated as described in
+Although a path can be first used by any host, it might not be practical for
+one of the peers to start using new paths. A possible cause is when a server
+wants to initiate the usage of a new path to a NAT'd client. The client would
+possibly not receive the packet, leading to connectivity issues on that path.
+To avoid such issues, a remote address MUST have been validated as described in
 {{PR1012}} before sending packets on a path using it.
 
 
@@ -422,68 +433,77 @@ server can then validate the public address and make the link between the
 advertised and the perceived addresses.
 
 
-Path Migration
---------------
-
-At a given time, a Multipath QUIC connection gathers a set of paths,
-each denoted by a 4-tuple. To address privacy issues due to the
-linkability of addresses with Connection IDs, a path should not change
-the 4-tuple it uses. However, there are two main causes that might
-change the 4-tuple used by an host: host-unaware change (e.g., NAT
-rebinding) and host-aware change (e.g., network handover from WiFi to cellular). For each case, a mechanism is proposed.
-
-In case of host-unaware change, hosts must ensure that the new 4-tuple
-actually belongs to the remote. [TODO ADD REF TO PR]. Once the new
-address has been validated, the server can send a NEW_CONNECTION_ID
-frame with the MIGRATE flag set. It contains two Path IDs: the
-previously used one and a new one. Upon reception of this frame, the
-client MUST stop using the previously used path and can start using the
-new one with the same perceived 4-tuple.
-
-In case of host-aware change...
-
-TODO: IDEA OF NEW_CONNECTION_ID WITH MIGRATE FLAG
-This provides server with full control about the path resources, can fit both
-NAT rebinding and handover cases.
-
-//TODO: Address/network loss = PATHS + REMOVE_ADDRESS frame (stop sending)
-//Privacy concern = MIGRATE_PATH
-Content: Old Path ID, New Path ID
-
-
 Coping with Address Removals
 ----------------------------
 
 During the life of the QUIC connection, an host might lose some of its
-addresses. A concrete example is a smartphone going out of
-reachability of a WiFi network or shutting off one of its network
-interfaces. Such address removals are advertised by REMOVE_ADDRESS
-frames. Those frames contain the Address ID of the lost address.
+addresses. A concrete example is a smartphone going out of reachability of a
+WiFi network or shutting off one of its network interfaces. Such address
+removals are advertised by REMOVE_ADDRESS frames. Those frames contain the
+Address ID of the lost address. Upon reception of this frame, the host MUST NOT
+send any additional packet to the address referenced by the Address ID.
 
-Thanks to this frame, an host can stop using a path whose 4-tuple
-contains the removed address. However, if a NAT'd client losses its
-private address and advertises this event, the sever will not know to
-which public address this advertisement is intended and might still use
-paths using that particular address. The PATHS frame helps the server
-to perform the mapping between both addresses. It contains for each
-active path the local Address ID used by the sending host. With both
-the PATHS and the REMOVE_ADDRESS frames, the server can identify which
-paths will be affected by the address removal to stop their usage
-before being migrated to another 4-tuple.
+When an address removal affects one of the paths in use, the sending host MUST
+send a PATHS frame with the current active paths and their corresponding local
+Address ID. This enables the remote to confirm the paths that are affected by
+the address removal. Hosts MAY change the 4-tuple used by a path affected by
+the removal event. In such case, the PATHS frame MUST indicate that change.
+
+Path Migration {#path-migration}
+--------------
+
+At a given time, a Multipath QUIC connection gathers a set of paths, each
+using a 4-tuple. To address privacy issues due to the linkability of addresses
+with Connection IDs, an host SHOULD NOT change the 4-tuple used by a path.
+There remain situations where this change is unavoidable. These can be
+categorized into two groups: host-aware change (e.g., network handover from
+WiFi to cellular) and host-unaware change (e.g., NAT rebinding).
+
+For the host-aware case, let's take the case of a Multipath QUIC connection
+where the client is a smartphone with both WiFi and cellular connectivities. It
+advertised both its addresses and the server currently enables only one path,
+the Initial one. The Initial Path uses the WiFi address. Then, for some
+reason, the WiFi address is lost. To keep connectivity, the client might then
+decides to use the cellular address for the Initial Path. It thus takes care
+to send a REMOVE_ADDRESS advertising the loss of the WiFi address and a PATHS
+frame to inform that the Initial Path is now using the cellular address. If the
+cellular address validation succeeds (which can have been done as soon as the
+cellular address was advertised), the server can then continue exchanging data
+on the cellular address.
+
+However, both server and client might want to change the path used on the
+cellular address for privacy concerns. If the server provides an additional
+path (let's take Path ID 42) through NEW_CONNECTION_ID frame at the beginning
+of the connection, the client can perform the path change directly and avoid
+using the Initial Path Path Connection ID on the cellular address. This can be
+done using the MIGRATE_PATH frame. It indicates that the host stops to use the
+Initial Path to use the Path ID 42 instead. This frame is put in the first
+packet sent to the new path with its corresponding PCID. The client can then
+send the REMOVE_ADDRESS and PATHS frames on this new path. Compared to the
+previous case, it is much harder to link the paths with the IP addresses to
+observe they belong to the same Multipath QUIC connection.
+
+For the host-unaware case, the situation is similar. In case of NAT rebinding,
+the server will observe a change in the 2-tuple (source IP, source port) of the
+packet. The server first validates that the 2-tuple actually belongs to the
+client {{PR1012}}. If it is the case, the server can send a MIGRATE_PATH frame
+on a previously communicated but unused Path ID. The client might have sent
+some packets with a given PCID on a different 4-tuple, but the server did not
+use the given PCID on that 4-tuple.
 
 
 Congestion Control
 ------------------
 
 The QUIC congestion control scheme is defined in {{I-D.ietf-quic-recovery}}.
-This congestion control scheme is not suitable when several paths are
-active. Using the congestion control scheme defined in {{I-D.ietf-quic-recovery}}
-with Multipath QUIC would result in unfairness. Each path of a Multipath QUIC
+This congestion control scheme is not suitable when several paths are active.
+Using the congestion control scheme defined in {{I-D.ietf-quic-recovery}} with
+Multipath QUIC would result in unfairness. Each path of a Multipath QUIC
 connection MUST have its own congestion window. The windows of the different
 paths MUST be coupled together. Multipath TCP uses the LIA congestion control
 scheme specified in {{RFC6356}}. This scheme can immediately be adapted to
-Multipath QUIC. Other coupled congestion control schemes have been
-proposed for Multipath TCP such as {{OLIA}}.
+Multipath QUIC. Other coupled congestion control schemes have been proposed
+for Multipath TCP such as {{OLIA}}.
 
 
 Mapping Path ID to Connection ID
@@ -790,6 +810,14 @@ To support the multipath operations, new frames have been defined to
 coordinate hosts. This draft uses a type field containing 0x20 to
 indicate that the frame is related to multipath operations.
 
+MAX_PATHS Frame
+---------------
+
+TODO decreasing number
+
+MIGRATE_PATH Frame
+------------------
+
 ADD_ADDRESS Frame
 -----------------
 
@@ -978,6 +1006,8 @@ Change Log
 Since draft-deconinck-multipath-quic-00
 -------------------------------
 
+- Added MIGRATE_PATH frame
+- Added MAX_PATHS frame
 - Implicit Path ID notification using Connection ID and NEW_CONNECTION_ID   
   frames
 - Variable-length encoding for Path ID
