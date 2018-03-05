@@ -31,7 +31,9 @@ normative:
   I-D.ietf-quic-transport:
   I-D.ietf-quic-tls:
   I-D.ietf-quic-recovery:
+  I-D.ietf-quic-invariants:
 informative:
+  I-D.huitema-quic-mpath-req:
   RFC0793:
   RFC6356:
   RFC6824:
@@ -115,7 +117,11 @@ informative:
 
 --- abstract
 
-REWRITE
+This document proposes extensions to the QUIC protocol to enable the usage of
+multiple paths over a single connection. Those changes remains compliant with
+the current single-path QUIC design. They allow devices to benefit from
+multiple network accesses while keeping current privacy features of QUIC.
+
 
 --- middle
 
@@ -305,12 +311,15 @@ Connection IDs. The first one is the Master Connection ID (MCID). It uniquely
 identifies the connection, as with the current QUIC design. The second one is
 the Path Connection ID (PCID). Packets belonging to a given path share the
 same PCID written in the Connection ID field of the public header. The PCID
-acts as an implicit path identifier for packets. This makes the linkability of
-different paths harder than having explicit signaling as in the first version
-of this draft. The MCID of a connection will be the PCID of the Initial Path.
-In the example shown in {{examplempquic}}, if the connection started on the
-WiFi network, then the Connection ID A is both the PCID of the WiFi path and
-the MCID of the connection.
+acts as an implicit path identifier for packets. Preventing the linkability of
+different paths is an important requirement for the multipath extension
+{{I-D.huitema-quic-mpath-req}}. Using PCID as implicit path identifier makes
+this linkability harder than having explicit signaling as in the first version
+of this draft and does not require public header change to keep invariants
+{{I-D.ietf-quic-invariants}}. The MCID of a connection will be the PCID of the
+Initial Path. In the example shown in {{examplempquic}}, if the connection
+started on the WiFi network, then the Connection ID A is both the PCID of the
+WiFi path and the MCID of the connection.
 
 In addition to the PCID, some additional information is kept for each path.
 The Path ID identifies the path at frame level and ensures uniqueness of the
@@ -335,7 +344,9 @@ PCID for a given Path ID. Once the client receives and acknowledges the frame,
 it can start using the new path by placing the PCID in the Connection ID field
 of the packets. The server can start using a path once the corresponding
 NEW_CONNECTION_ID has been acknowledged. Both hosts keep the NEW_CONNECTION_ID
-information in order to cope with the remote trying to use a new path.
+information in order to cope with the remote trying to use a new path. As
+frames are encrypted, the establishment of new paths does not leak cleartext
+identifiers {{I-D.huitema-quic-mpath-req}}.
 
 A server might provide more Path IDs with NEW_CONNECTION_ID frames than the
 value advertised in the MAX_PATHS frame. This can be useful for migration
@@ -417,7 +428,9 @@ frame is transmitted when a host has a new address. This ADD_ADDRESS frame is
 protected as other QUIC control frames, which implies that it cannot be
 spoofed by attackers. The communicated address is first validated by the
 receiving host before it starts using it. This ensures that the address
-actually belongs to the peer and avoids amplification attacks.
+actually belongs to the peer and that the peer can send and receive packets on
+that address. It also prevents hosts from creating amplification attacks to a
+victim address.
 
 If the client is NAT'd, it might be possible to have a private address in an
 ADD_ADDRESS frame. In such situations, the server would not be able to
