@@ -2,7 +2,7 @@ xml2rfc ?= xml2rfc
 kramdown-rfc2629 ?= kramdown-rfc2629
 idnits ?= idnits
 
-draft := draft-deconinck-multipath-quic
+draft := draft-deconinck-quic-multipath
 current_ver := $(shell git tag | grep "$(draft)" | tail -1 | sed -e"s/.*-//")
 ifeq "${current_ver}" ""
 next_ver ?= 00
