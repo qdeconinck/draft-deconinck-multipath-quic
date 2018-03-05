@@ -36,10 +36,6 @@ informative:
   RFC6356:
   RFC6824:
   RFC8041:
-  PR1012:
-     title: "A more complete connection migration"
-     date: "2017"
-     seriesinfo: "https://github.com/quicwg/base-drafts/pull/1012"
   Cellnet:
      title: "Exploring Mobile/WiFi Handover with Multipath TCP"
      date: "2012"
@@ -140,12 +136,13 @@ from using multiple paths. QUIC {{I-D.ietf-quic-transport}} does not use the
 5-tuple as an implicit connection identifier. A QUIC flow is identified by its
 Connection ID. This enables flows to cope with events affecting the 5-tuple,
 such as NAT rebinding or IP address changes. This connection migration feature,
-now described in more details in {{PR1012}}, is key for QUIC to migrate a flow
-from one 5-tuple to another one. Such migration feature offers the opportunity
-to QUIC to use multiple paths. Usecases such as bandwidth aggregations or
-seamless network handovers would be applicable to QUIC, as they are now with
-Multipath TCP. A first performance evaluation of such use cases and a
-comparison between Multipath QUIC and Multipath TCP may be found in {{MPQUIC}}.
+now described in more details in {{I-D.ietf-quic-transport}}, is key for QUIC
+to migrate a flow from one 5-tuple to another one. Such migration feature
+offers the opportunity to QUIC to use multiple paths. Usecases such as
+bandwidth aggregations or seamless network handovers would be applicable to
+QUIC, as they are now with Multipath TCP. A first performance evaluation of
+such use cases and a comparison between Multipath QUIC and Multipath TCP may
+be found in {{MPQUIC}}.
 
 In this draft, we leverage many of the lessons learned from the design of
 Multipath TCP and comments received from the first version of this draft to
@@ -181,7 +178,7 @@ Notational Conventions
 Packet and frame diagrams use the format described in Section 2.1 of
 {{I-D.ietf-quic-transport}}, with the following additional convention:
 
-x (j) ... Indicates that x uses the variable-length encoding in
+x (j) ... Indicates that x uses the variable-length encoding described in
    {{variable-length-pid}}
 
 Overview
@@ -226,17 +223,18 @@ A QUIC connection can thus start on a given path and end on another one.
 However, the current QUIC design {{I-D.ietf-quic-transport}} assumes that only
 one path is in use for a given connection. Instead of switching the 4-tuple
 for the whole connection, this draft proposes to leverage the address
-validation process proposed in {{PR1012}} to verify if additional addresses
-advertised by the communicating host are available and actually belong to it.
-In such case, those addresses can be used to create new paths to spread packets
-over several networks. The example presented in {{examplempquic}} shows a
-possible data exchange between a dual-homed client performing a request fitting
-in two packets and a single-homed server.
+validation process with the PATH_CHALLENGE and PATH_RESPONSE frames proposed
+in {{I-D.ietf-quic-transport}} to verify if additional addresses advertised by
+the communicating host are available and actually belong to it. In such case,
+those addresses can be used to create new paths to spread packets over several
+networks. The example presented in {{examplempquic}} shows a possible data
+exchange between a dual-homed client performing a request fitting in two
+packets and a single-homed server.
 
 
 ~~~~~~~~~~
 Server                          Phone                          Server
-via WiFi                                                       via LTE
+via WiFi                                                      via LTE
 -------                        -------                          -----
   | Pkt(CID=A,PN=1,frames=[       |                               |
   |  STREAM("Request (1/2)")])    | Pkt(CID=B,PN=1,frames=[       |
@@ -332,22 +330,22 @@ paths can currently be in use. This can be done using a new MAX_PATHS frame
 indicating how many additional paths can be simultaneously in use.
 
 The server proposes new paths with an extended version of the
-NEW_CONNECTION_ID frame (see {{newconnectionid}}). That frame proposes a PCID
-for a given Path ID. Once the client receives and acknowledges the frame, it
-can start using the new path by placing the PCID in the Connection ID field of
-the packets. The server can start using a path once the corresponding
+NEW_CONNECTION_ID frame (see {{newconnectionidsec}}). That frame proposes a
+PCID for a given Path ID. Once the client receives and acknowledges the frame,
+it can start using the new path by placing the PCID in the Connection ID field
+of the packets. The server can start using a path once the corresponding
 NEW_CONNECTION_ID has been acknowledged. Both hosts keep the NEW_CONNECTION_ID
 information in order to cope with the remote trying to use a new path.
 
 A server might provide more Path IDs with NEW_CONNECTION_ID frames than the
 value advertised in the MAX_PATHS frame. This can be useful for migration
-cases, as described in {{path-migration}}. In such cases, the client MUST NOT
-initiate more paths than the number advertised in the last MAX_PATHS frame.
-Multipath QUIC is fully symmetrical. Both the client and the server can start
-using new paths once their corresponding PCID have been negotiated. It might
-happen that both hosts try to create paths with different Path IDs, such that
-there are more paths than the advertised number in MAX_PATHS frame. In that
-case, hosts will keep paths with the lowest Path IDs.
+cases, as described in {{path-migration}}. In such cases, hosts can only use a
+subset of the proposed Path IDs. Multipath QUIC is fully symmetrical. Both the
+client and the server can start using new paths once their corresponding PCID
+have been negotiated. It might happen that both hosts try to create paths with
+different Path IDs, such that there are more paths than the advertised number
+in MAX_PATHS frame. In that case, hosts will keep paths with the lowest Path
+IDs.
 
 The client is not able to create new paths as long as the server does not send
 NEW_CONNECTION_ID and MAX_PATHS frames. To limit the latency of the path
@@ -359,7 +357,7 @@ one of the peers to start using new paths. A possible cause is when a server
 wants to initiate the usage of a new path to a NAT'd client. The client would
 possibly not receive the packet, leading to connectivity issues on that path.
 To avoid such issues, a remote address MUST have been validated as described in
-{{PR1012}} before sending packets on a path using it.
+{{I-D.ietf-quic-transport}} before sending packets on a path using it.
 
 
 Exchanging Data over Multiple Paths
@@ -388,8 +386,8 @@ increasing packet numbers. To ensure more flexibility and potentially to
 reduce the ACK block section of the ACK frame when aggregating bandwidth of
 paths exhibiting different network characteristics, each path keeps its own
 monotonically increasing Packet Number space. This potentially allows sending
-2^32 * 2^62 packets on a QUIC connection since each path (with a Path ID
-encoded on 4 bytes) has its own packet number space.
+up to 2^32 * 2^62 packets on a QUIC connection since each path has its own
+packet number space.
 
 The ACK frame is also modified to allow per-path packet acknowledgments. This
 remains compliant with the design decision of the independence between packets
@@ -417,9 +415,9 @@ Address ID given by the sending host. The addresses assigned to a host can
 vary during the lifetime of a Multipath QUIC connection. A new ADD_ADDRESS
 frame is transmitted when a host has a new address. This ADD_ADDRESS frame is
 protected as other QUIC control frames, which implies that it cannot be
-spoofed by attackers. However, an host receiving an ADD_ADDRESS must first
-validate that the advertised address actually belongs to the peer before
-starting to use it.
+spoofed by attackers. The communicated address is first validated by the
+receiving host before it starts using it. This ensures that the address
+actually belongs to the peer and avoids amplification attacks.
 
 If the client is NAT'd, it might be possible to have a private address in an
 ADD_ADDRESS frame. In such situations, the server would not be able to
@@ -439,22 +437,21 @@ Coping with Address Removals
 During the life of the QUIC connection, an host might lose some of its
 addresses. A concrete example is a smartphone going out of reachability of a
 WiFi network or shutting off one of its network interfaces. Such address
-removals are advertised by REMOVE_ADDRESS frames. Those frames contain the
-Address ID of the lost address. Upon reception of this frame, the host MUST NOT
-send any additional packet to the address referenced by the Address ID.
+removals are advertised by REMOVE_ADDRESS frames. However, the address lost by
+an host might not be visible by the peer. A concrete example is a private NAT'd
+address lost. This will affect the public address presented by the NAT to the
+remote. To make the link, the REMOVE_ADDRESS contains the Address ID of the
+lost address previously communicated through ADD_ADDRESS. By combining this
+with PATHS frames making the link between Path IDs and Address IDs, this
+allows the peer to avoid continuing to use the affected.
 
-When an address removal affects one of the paths in use, the sending host MUST
-send a PATHS frame with the current active paths and their corresponding local
-Address ID. This enables the remote to confirm the paths that are affected by
-the address removal. Hosts MAY change the 4-tuple used by a path affected by
-the removal event. In such case, the PATHS frame MUST indicate that change.
 
 Path Migration {#path-migration}
 --------------
 
 At a given time, a Multipath QUIC connection gathers a set of paths, each
 using a 4-tuple. To address privacy issues due to the linkability of addresses
-with Connection IDs, an host SHOULD NOT change the 4-tuple used by a path.
+with Connection IDs, hosts should avoid changing the 4-tuple used by a path.
 There remain situations where this change is unavoidable. These can be
 categorized into two groups: host-aware change (e.g., network handover from
 WiFi to cellular) and host-unaware change (e.g., NAT rebinding).
@@ -476,20 +473,20 @@ cellular address for privacy concerns. If the server provides an additional
 path (let's take Path ID 42) through NEW_CONNECTION_ID frame at the beginning
 of the connection, the client can perform the path change directly and avoid
 using the Initial Path Path Connection ID on the cellular address. This can be
-done using the MIGRATE_PATH frame. It indicates that the host stops to use the
-Initial Path to use the Path ID 42 instead. This frame is put in the first
+done using the PATH_UPDATE frame. It can indicate that the host stops to use
+the Initial Path to use the Path ID 42 instead. This frame is put in the first
 packet sent to the new path with its corresponding PCID. The client can then
 send the REMOVE_ADDRESS and PATHS frames on this new path. Compared to the
-previous case, it is much harder to link the paths with the IP addresses to
-observe they belong to the same Multipath QUIC connection.
+previous case, it is harder to link the paths with the IP addresses to observe
+they belong to the same Multipath QUIC connection.
 
 For the host-unaware case, the situation is similar. In case of NAT rebinding,
 the server will observe a change in the 2-tuple (source IP, source port) of the
 packet. The server first validates that the 2-tuple actually belongs to the
-client {{PR1012}}. If it is the case, the server can send a MIGRATE_PATH frame
-on a previously communicated but unused Path ID. The client might have sent
-some packets with a given PCID on a different 4-tuple, but the server did not
-use the given PCID on that 4-tuple.
+client {{I-D.ietf-quic-transport}}. If it is the case, the server can send a
+PATH_UPDATE frame on a previously communicated but unused Path ID. The client
+might have sent some packets with a given PCID on a different 4-tuple, but the
+server did not use the given PCID on that 4-tuple.
 
 
 Congestion Control
@@ -536,6 +533,10 @@ using the PCID and associate it with the corresponding Path ID.
 Using Multiple Paths
 ====================
 
+This section describes in details the multipath operations with the QUIC
+protocol.
+
+
 Multipath Negotiation
 ---------------------
 
@@ -563,15 +564,15 @@ max_path_id (0x0020):
     addition to the Initial Path that the host agree to support over the
     connection, encoded as an unsigned 32-bit integer. This sets a upper bound
     on the Path IDs that can be used. The default value for this parameter is
-    0, meaning that an host omitting this transport parameter does not want to
+    0, meaning that an host omitting this transport parameter does not agree to
     use multiple paths over the connection.
 
 
 Variable-Length Encoding of the Path ID {#variable-length-pid}
 ---------------------------------------
 
-From the negotiated maximum path ID, hosts can infer the amount of bits
-required to encode the Path ID. If the maximum path ID is 255, only one byte
+From the negotiated maximum Path ID, hosts can infer the amount of bits
+required to encode the Path ID. If the maximum Path ID is 255, only one byte
 suffices. Similarly, if one of the hosts wants a single-path connection,
 either by advertising a max_path_id of 0 or by omitting it, the Path ID field
 should not be present.
@@ -615,8 +616,8 @@ ADD_ADDRESS frames, a malicious server might advertise the IP address of a
 victim, hoping that the client will use it without validating it before.
 
 The validation of an address could be performed with PATH_CHALLENGE and
-PATH_RESPONSE frames as described in {{PR1012}}. A validated address MAY be
-cached for a given host for a limited amount of time.
+PATH_RESPONSE frames as described in {{I-D.ietf-quic-transport}}. A validated
+address MAY be cached for a given host for a limited amount of time.
 
 
 Path State
@@ -639,26 +640,28 @@ state. The possible path states are depicted in {{path_state}}.
  | ACTIVE |       reusing path          | UNUSABLE |
  +--------+ <-------------------------- +----------+
       |                                       |
-      | PATHS_MIGRATE                         |
+      | PATH_UPDATE                           |
       +---------------------------------------+
       |
       v
-+----------+
-| MIGRATED |
-+----------+
+ +--------+
+ | CLOSED |
+ +--------+
 ~~~~~~~~~~
 {: #path_state title="Finite-State Machine of paths"}
 
 Once a path has been proposed in a NEW_CONNECTION_ID frame, it is in PROPOSED
 state. In this situation, hosts MUST keep the following path information:
 
-    o Path ID: encoded as a 4-byte number, it uniquely identifies the path in
-      the connection. This value is immutable.
-    o Path Connection ID: encoded as a 8-byte number, it makes the link between
-      the packet's Connection ID field and the path. This value can be updated
-      with subsequent NEW_CONNECTION_ID frames.
-    o Path State: the current state of the path, one of the values presented in
-      {{path_state}}.
+* Path ID: encoded as a 4-byte number, it uniquely identifies the path in the
+  connection. This value is immutable.
+* Master Connection ID: encoded as a 8-byte number, it makes the link between
+  the path and the QUIC connection it belongs to. This value is immutable.
+* Path Connection ID: encoded as a 8-byte number, it makes the link between
+  the packet's Connection ID field and the path. This value can be updated
+  with subsequent NEW_CONNECTION_ID frames.
+* Path State: the current state of the path, one of the values presented in
+  {{path_state}}.
 
 Hosts MUST ensure that they can perform the match between a packet with the
 PCID and its corresponding path at any time, as they must be ready to figure
@@ -670,27 +673,25 @@ the path goes to the ACTIVE state. This is the state where a path can be used
 to send and receive packets. In addition to the fields required in the PROPOSED
 state, the following elements MUST be tracked:
 
-    o Packet Number Space: each path is associated with own monotonically
-      increasing packet number space. Each endpoint maintains a separate
-      packet number for sending and receiving. Packet number considerations
-      described in {{I-D.ietf-quic-transport}} apply within a given path.
-    o Current 4-tuple: the tuple (sIP, dIP, sport, dport) used by the path to
-      send or receive packets. This value is mutable, either because the host
-      decides to change its local address and/or port, or because it receives
-      a packet with a different remote validated address and/or port than
-      currently recorded. A host that changes the 4-tuple of a path SHOULD
-      migrate it.
-    o Current (local Address ID, remote Address ID) tuple: those identifiers
-      come from the ADD_ADDRESS sent (local) and received (remote). This
-      enables host to mark a path as UNUSABLE when, e.g., the remote Address
-      ID is declared as lost by a REMOVE_ADDRESS. The addresses on which the
-      connection was established have Address ID 0. The reception of PATHS
-      frames helps hosts to perform the matching between the remote Address ID
-      and the path.
-    o Performance metrics: basic statistics such as round-trip-time or number
-      of packets sent and received can be collected on a per-path basis. This
-      information can be useful when an host needs to perform packet
-      scheduling decisions and flow control management.
+* Packet Number Space: each path is associated with own monotonically
+  increasing packet number space. Each endpoint maintains a separate packet
+  number for sending and receiving. Packet number considerations described in
+  {{I-D.ietf-quic-transport}} apply within a given path.
+* Current 4-tuple: the tuple (sIP, dIP, sport, dport) used by the path to send
+  or receive packets. This value is mutable, either because the host decides
+  to change its local address and/or port, or because it receives a packet
+  with a different remote validated address and/or port than currently
+  recorded. A host that changes the 4-tuple of a path SHOULD migrate it.
+* Current (local Address ID, remote Address ID) tuple: those identifiers come
+  from the ADD_ADDRESS sent (local) and received (remote). This enables host
+  to mark a path as UNUSABLE when, e.g., the remote Address ID is declared as
+  lost by a REMOVE_ADDRESS. The addresses on which the connection was
+  established have Address ID 0. The reception of PATHS frames helps hosts to
+  perform the matching between the remote Address ID and the path.
+* Performance metrics: basic statistics such as round-trip-time or number of
+  packets sent and received can be collected on a per-path basis. This
+  information can be useful when an host needs to perform packet scheduling
+  decisions and flow control management.
 
 It might happen that a path is temporarily unavailable, because one of the
 endpoint's addresses is no more available or because the server decides to
@@ -705,10 +706,11 @@ suceeds, or the number of paths increased again, a path in UNUSABLE state can
 goes into ACTIVE state, but its congestion window MUST be restarted and its
 performance metrics SHOULD be reset.
 
-Eventually, a path may be migrated to another one. In that case, the path is
-in MIGRATED state and no more packets can be sent or received over it. An host
-MUST keep the same path state field as in PROPOSED state, to avoid ambiguities
-and migrated path reuse.
+Eventually, a path may either be migrated to another one or closed. This is
+signalled by the PATH_UPDATE frame. In that cases, the path is in CLOSED state.
+In that state, packets MUST NOT be sent or received over it. An host MUST keep
+the same path state field as in PROPOSED state, to avoid ambiguities and CLOSED
+path reuse.
 
 
 Dynamic Management of Paths
@@ -725,20 +727,53 @@ agrees to use simultaneously. This can be useful in migration scenarios, where
 the server wants to share a pool of Path IDs that can be directly used to
 migrate paths.
 
-As long as no MAX_PATHS frame was seen, hosts MUST assume that only one path
-can be used. At the connection beginning, this means that only the Initial Path
-can be used. In this case however, during the connection, another path can be
-used, but the Initial Path MUST have been migrated. The server can then
-increase the value advertised in the MAX_PATHS frame to allow hosts to use new
-paths among the proposed Path ID pool.
+As long as no MAX_PATHS frame was seen coming from the server, the client MUST
+assume that only one path can be used. At the connection beginning, this means
+that only the Initial Path can be used. In this case however, during the
+connection, another path can be used, but the Initial Path MUST have been
+migrated to it. The server can then increase the value advertised in the
+MAX_PATHS frame to allow hosts to use new paths among the proposed Path ID
+pool.
 
-A server can also decrease the number of paths that can be used over a
-connection. If the server decrease this value below the current number of
-active paths, hosts MUST put in UNUSABLE state paths in ACTIVE state with the
-highest Path IDs. Server and client MUST stop sending packets once the
-MAX_PATHS has been sent or received. The server SHOULD allow receiving packets
-on newly UNUSABLE paths for one round-trip-time. After this delay, the server
-SHOULD silently discard received packets.
+By default, the client does not set any limit to the number of paths that can
+be used. If a client wants to limit the number of (additional) paths the server
+can use, it can also send a MAX_PATHS frame. In such case, the number of
+additional paths that can be used over the connection is the minimum between
+last advertised value from both sides.
+
+An host can also decrease the number of paths that can be used over a
+connection. If this value decreases below the current number of active paths,
+hosts MUST put in UNUSABLE state paths in ACTIVE state with the highest Path
+IDs. Server and client MUST stop sending packets over UNUSABLE paths once the
+MAX_PATHS has been sent or received. The host restricting the number of paths
+SHOULD allow receiving packets on newly UNUSABLE paths for one
+round-trip-time. After this delay, hosts SHOULD silently discard received
+packets.
+
+When the server proposes more Path IDs that the negotiated maximum number of
+ACTIVE paths, it might happen that both hosts decide at the same time to create
+paths with different Path IDs, such as there are more created paths than the
+negotiated maximum value. In such case, the hosts MUST only keep ACTIVE paths
+with the lowest Path IDs. Paths with the highest Path IDs are set in UNUSABLE
+state and packets SHOULD be silently discarded.
+
+
+Loosing Addresses
+-----------------
+
+During the connection, an host might lose addresses, e.g., a network interface
+that was shut down. All the ACTIVE paths that were using that local address
+MUST be set in UNUSABLE state. To advertise the address loss to the peer, the
+host MUST send a REMOVE_ADDRESS frame indicating which Address ID has been
+lost. The host MUST also send a PATHS frame indicating the status of the
+remaining ACTIVE paths.
+
+Upon reception of the REMOVE_ADDRESS, the receiving host MUST set the ACTIVE
+paths affected by the address removal into UNUSABLE state.
+
+The host that locally losts the address MAY reuse one of these paths by
+changing the assigned 4-tuple. In such case, the host MUST send a PATHS frame
+describing that change.
 
 
 Scheduling Strategies
@@ -762,7 +797,7 @@ the path it acknowledges, then the peer can compute the round-trip-time of the
 path. Otherwise, the peer would compute the latency as the sum of the foward
 delay of the acknowledged path and the return delay of the path the ACK frame
 has been sent. Choosing between acknowledging packets on the same path or on a
-specific path is up to the implementation. However, hosts SHOULD have a
+specific path is up to the implementation. However, hosts SHOULD keep a
 consistent acknowledgement strategy. Selecting a random path to acknowledge
 packets will possibly increase the variability of the latency estimation,
 especially if paths exhibit very different network characteristics. Unlike
@@ -781,7 +816,7 @@ for each path. The ACK frame contains packet-level information with the
 Largest Acknowledged field. Since the Packet Number are now linked to paths,
 the ACK frame must contain the Path ID it acknowledges.
 
-NEW_CONNECTION_ID Frame {# newconnectionid}
+NEW_CONNECTION_ID Frame {#newconnectionidsec}
 -----------------------
 
 The NEW_CONNECTION_ID frame (type=0x0b) as defined by
@@ -817,9 +852,11 @@ The NEW_CONNECTION_ID is as follows:
 
 Compared to the frame specified in {{I-D.ietf-quic-transport}}, a Path ID
 field of variable size is prefixed to make the link between the Path ID and
-the Connection ID. This frame MUST only be sent by the server. Upon reception
-of the frame with a specified path ID, the client can start using the new path
-with the matching Connection ID.
+the Connection ID. If the multipath extension was not negotiated during the
+connection establishment, the NEW_CONNECTION_ID frame is the same as the one
+presented in {{I-D.ietf-quic-transport}}. This frame MUST only be sent by the
+server. Upon reception of the frame with a specified path ID, the client can
+start using the new path with the matching Connection ID.
 
 An host MUST NOT start using a path if no related NEW_CONNECTION_ID frame have
 been received (at client side) or acknowledged (at server side). To limit the
@@ -829,9 +866,8 @@ establishment completes.
 
 To cope with privacy issues, it should be hard to make the link between two
 different connections or two different paths of a same connection by just
-looking at the Connection ID contained in packets. Therefore, Connection IDs
-chosen by the server for multiple paths of a same connection MUST be generated
-in a random fashion.
+looking at the Connection ID contained in packets. Therefore, Path Connection
+IDs chosen by the server MUST be generated in a random fashion.
 
 It might happen that server proposes a Connection ID in a NEW_CONNECTION_ID
 frame that is already in use by the client for another connection with another
@@ -864,8 +900,10 @@ The format of the modified ACK frame is shown below.
 {: #ack_frame title="ACK Frame adapted to Multipath"}
 
 Compared to the ACK frame in the current QUIC design
-{{I-D.ietf-quic-transport}}, the ACK frame contains a variable size Path ID
-field indicating to which path the acknowledged PSNs relate to.
+{{I-D.ietf-quic-transport}}, the ACK frame is prefixed by a variable size Path
+ID field indicating to which path the acknowledged PSNs relate to. Notice that
+if the multipath extension was not negotiated during the connection handshake,
+the ACK frame is the same as the one presented in {{I-D.ietf-quic-transport}}.
 
 Since frames are independent of packets, and the path notion relates to the
 packets, the ACK frames can be sent on any path, unlike Multipath TCP
@@ -883,8 +921,8 @@ that the frame is related to multipath operations.
 MAX_PATHS Frame
 ---------------
 
-The MAX_PATHS frame is used by the server to control the number of paths that
-can be simultaneously in ACTIVE state over the connection. The proposed type
+The MAX_PATHS frame is used by hosts to control the number of paths that can
+be simultaneously in ACTIVE state over the connection. The proposed type
 for the MAX_PATHS frame is 0x20. A MAX_PATHS frame is shown below.
 
 ~~~~~~~~~~
@@ -900,29 +938,32 @@ for the MAX_PATHS frame is 0x20. A MAX_PATHS frame is shown below.
 
 The MAX_PATHS frame contains the following fields:
 
-    o Sequence: A variable-length integer. This value starts at 0 and increase
-      by 1 for each change of number of active paths that is provided by the
-      server.
+* Sequence: A variable-length integer. This value starts at 0 and increase by
+  1 for each change of number of active paths that is provided by the host.
 
-    o Num Additional Active Paths: A variable-length integer indicating how
-      many additional paths can be used over the connection. The number of
-      paths that can be in ACTIVE state is thus (Num Additional Active Paths +
-      1).
+* Num Additional Active Paths: A variable-length integer indicating how many
+  additional paths can be used over the connection. The number of paths that
+  can be in ACTIVE state is thus (Num Additional Active Paths + 1).
+
+Once the connection is established, hosts MUST assume that the server sent a
+MAX_PATHS frame with sequence -1 and number of additional active paths equal to
+0 and the client sent a MAX_PATHS frame with sequence -1 and number of
+additional active paths equal to the negotiated max_path_id value.
 
 
-MIGRATE_PATH Frame
-------------------
+PATH_UPDATE Frame
+-----------------
 
-The MIGRATE_PATH frame is used by a host to migrate a path to another one. This
-indicates to the remote that the migrated path MUST NOT be used anymore and it
-can use the proposed one instead. The proposed type for the MIGRATE_PATH is
-0x21. A MIGRATE_PATH frame is shown below.
+The PATH_UPDATE frame is used by a host either to migrate a path to another
+one or to close it. This indicates to the remote that the closed path MUST NOT
+be used anymore and it can use the proposed one instead, if any. The proposed
+type for the PATH_UPDATE is 0x21. A PATH_UPDATE frame is shown below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Migrated Path ID (j)                  ...
+|                        Closed Path ID (j)                   ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                       Proposed Path ID (j)                  ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -931,12 +972,17 @@ can use the proposed one instead. The proposed type for the MIGRATE_PATH is
 
 The MIGRATE_PATH frame contains the following fields:
 
-    o Migrated Path ID: A variable-length integer corresponding to the Path ID
-      of the path that is migrated.
+* Closed Path ID: A variable-length integer corresponding to the Path ID of
+  the path that is closed.
 
-    o Proposed Path ID: A variable-length integer corresponding to the Path ID
-      of the path that substitutes the migrated path. The path MUST be in
-      PROPOSED state just before sending this frame.
+* Proposed Path ID: A variable-length integer corresponding to the Path ID of
+  the path that substitutes the closed path. If the value is 0, no path is
+  proposed.
+
+Upon sending or reception of the PATH_UPDATE frame, the path with the Path ID
+referenced in Closed Path ID MUST be in CLOSED state. If the proposed Path ID
+is different of 0, the path MUST have been either in PROPOSED or in UNUSABLE
+state and MUST be now considered as ACTIVE.
 
 
 ADD_ADDRESS Frame
@@ -961,25 +1007,24 @@ frame is shown below.
 
 The ADD_ADDRESS frame contains the following fields:
 
-    o Reserved bits: the three most-significant bits of the first byte are    
-      set to 0, and are reserved for future use.
+* Reserved bits: the three most-significant bits of the first byte are set to
+  0, and are reserved for future use.
 
-    o P bit: the fourth most-significant bit of the first byte indicates, if   
-      set, the presence of the Port field.
+* P bit: the fourth most-significant bit of the first byte indicates, if set,
+  the presence of the Port field.
 
-    o IPVers.: the remaining four least-significant bits of the first byte
-      contains the version of the IP address contained in the IP Address field.
+* IPVers.: the remaining four least-significant bits of the first byte
+  contains the version of the IP address contained in the IP Address field.
 
-    o Address ID: an unique identifier for the advertised address for tracking
-      and removal purposes. This is needed when, e.g., a NAT changes the IP
-      address such that both hosts see different IP addresses for a same path
-      endpoint.
+* Address ID: an unique identifier for the advertised address for tracking and
+  removal purposes. This is needed when, e.g., a NAT changes the IP address
+  such that both hosts see different IP addresses for a same path endpoint.
 
-    o IP Address: the advertised IP address, in network order.
+* IP Address: the advertised IP address, in network order.
 
-    o Port: this optional field indicates the port number related to the
-      advertised IP address. When this field is present, it indicates that a
-      path can use the 2-tuple (IP addr, port).
+* Port: this optional field indicates the port number related to the
+  advertised IP address. When this field is present, it indicates that a path
+  can use the 2-tuple (IP addr, port).
 
 
 Upon reception of an ADD_ADDRESS frame, the receiver SHOULD store the
@@ -1023,6 +1068,8 @@ format of the PATHS frame is shown below.
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                          Sequence (i)                       ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                        ActivePaths (j)                      ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                     Path Info Section (*)                   ...
@@ -1032,14 +1079,17 @@ format of the PATHS frame is shown below.
 
 The PATHS frame contains the following fields:
 
-    o ActivePaths: the current number of additional paths considered as active
-      sender point of view, i.e., (the number of active paths - 1).
-      ActivePaths MUST be lower or equal to the last value advertised by a
-      MAX_PATHS frame.
+* Sequence: A variable-length integer. This value starts at 0 and increase by
+  1 for each PATHS frame sent by the host. It allows identifying the most
+  recent PATHS frame.
 
-    o Path Info Section: contains information about all the active paths
-      (i.e., there are ActivePaths + 1 entries). The format of this section is
-      shown below.
+* ActivePaths: the current number of additional paths considered as active
+  sender point of view, i.e., (the number of active paths - 1). ActivePaths
+  MUST be lower or equal to the last value advertised by a MAX_PATHS frame.
+
+* Path Info Section: contains information about all the active paths (i.e.,
+  there are ActivePaths + 1 entries). The format of this section is shown
+  below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
@@ -1060,14 +1110,13 @@ The PATHS frame contains the following fields:
 
 The fields in the Path Info Section are:
 
-    o Path ID: the Path ID of the active path the sending host provides
-      information about.
+* Path ID: the Path ID of the active path the sending host provides
+  information about.
 
-    o LocAddrID: the local Address ID of the address currently used by the
-      path.
+* LocAddrID: the local Address ID of the address currently used by the path.
 
 The Path Info section only contains the Local Address ID so far, but this
-section can be extended later with other potentially useful inforamtion.
+section can be extended later with other potentially useful information.
 
 
 Security Considerations
@@ -1115,6 +1164,15 @@ the "QUIC Transport Parameters" registry under the "QUIC Protocol" heading.
 {: #iana-tp-table title="Addition to QUIC Transport Parameters Entries"}
 
 
+Acknowledgements
+================
+
+We would like to thanks Masahiro Kozuka and Kazuho Oku for their numerous
+comments on the first version of this draft. We also want to thanks Christian
+Huitema for his draft about multipath requirements to identify critical
+elements about the multipath feature.
+
+
 --- back
 
 Change Log
@@ -1123,10 +1181,11 @@ Change Log
 Since draft-deconinck-multipath-quic-00
 -------------------------------
 
-- Added MIGRATE_PATH frame
+- Added PATH_UPDATE frame
 - Added MAX_PATHS frame
+- No more packet header change
 - Implicit Path ID notification using Connection ID and NEW_CONNECTION_ID   
   frames
 - Variable-length encoding for Path ID
-- Updated text to match draft-ietf-quic-transport-09
+- Updated text to match draft-ietf-quic-transport-10
 - Fixed various typos
