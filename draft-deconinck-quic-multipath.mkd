@@ -1,7 +1,7 @@
 ---
 title: Multipath Extension for QUIC
 abbrev: MP-QUIC
-docname: draft-deconinck-quic-multipath-01
+docname: draft-deconinck-quic-multipath-00
 date: today
 category: std
 updates:
