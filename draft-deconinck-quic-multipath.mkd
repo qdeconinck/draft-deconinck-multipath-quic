@@ -1,7 +1,7 @@
 ---
 title: Multipath Extension for QUIC
 abbrev: MP-QUIC
-docname: draft-deconinck-quic-multipath-00
+docname: draft-deconinck-quic-multipath-01
 date: today
 category: std
 updates:
@@ -140,7 +140,7 @@ With regular TCP and UDP, all the packets that belong to a given flow contain
 the same 5-tuple that acts as an identifier for this flow. This prevents such
 flows from using multiple paths. QUIC {{I-D.ietf-quic-transport}} does not use
 the 5-tuple as an implicit connection identifier. A QUIC flow is identified by
-its Connection ID. This enables QUIC flows to cope with events affecting the
+two Connection IDs. This enables QUIC flows to cope with events affecting the
 5-tuple, such as NAT rebinding or IP address changes. The QUIC connection
 migration feature, described in more details in
 {{I-D.ietf-quic-transport}}, is key to migrate a flow from one 5-tuple to
@@ -183,10 +183,8 @@ Notational Conventions
 ----------------------
 
 Packet and frame diagrams use the format described in Section 2.1 of
-{{I-D.ietf-quic-transport}}, with the following additional convention:
+{{I-D.ietf-quic-transport}}.
 
-x (j) ... Indicates that x uses the variable-length encoding scheme described
-  in {{variable-length-pid}}.
 
 Overview {#overview}
 ========
@@ -243,28 +241,28 @@ single-homed server.
 
 
 ~~~~~~~~~~
-Server                          Phone                          Server
-via WiFi                                                      via LTE
--------                        -------                          -----
-  | Pkt(CID=A,PN=1,frames=[       |                               |
-  |  STREAM("Request (1/2)")])    | Pkt(CID=B,PN=1,frames=[       |
-  |<------------------------------|  STREAM("Request (2/2)")])    |
-  | Pkt(CID=A,PN=1,frames=[       |--------                       |
-  |  ACK(PID=1,LargestAcked=1)])  |       |----------             |
-  |------------------------------>|                 |----------   |
-  | Pkt(CID=A,PN=2,frames=[       |                           |-->|
-  |  STREAM("Response 1")])       | Pkt(CID=B,PN=1,frames=[       |
-  |------------------------------>|  ACK(PID=2,LargestAcked=1),   |
-  |                               |  STREAM("Response 2")])   ----|
-  | Pkt(CID=A,PN=2,frames=[       |                 ----------|   |
-  |  ACK(PID=1, LargestAcked=2),  |       ----------|             |
-  |  ACK(PID=2, LargestAcked=1)]) |<------|                       |
-  |<------------------------------|                               |
-  | Pkt(CID=A,PN=3,frames=[       | Pkt(CID=B,PN=2,frames=[       |
-  |  STREAM("Response 3")])       |  STREAM("Response 4")])       |
-  |------------------------------>|                           ----|
-  |                               |                 ----------|   |
-  |            ...                |  ...  <---------|             |
+Server                           Phone                           Server
+via WiFi                                                        via LTE
+-------                         -------                           -----
+  | Pkt(DCID=B,PN=1,frames=[       |                                |
+  |  STREAM("Request (1/2)")])     | Pkt(DCID=D,PN=1,frames=[       |
+  |<-------------------------------|  STREAM("Request (2/2)")])     |
+  | Pkt(DCID=A,PN=1,frames=[       |--------                        |
+  |  ACK(PID=1,LargestAcked=1)])   |       |----------              |
+  |------------------------------->|                 |----------    |
+  | Pkt(DCID=B,PN=2,frames=[       |                           |--->|
+  |  STREAM("Response 1")])        | Pkt(DCID=C,PN=1,frames=[       |
+  |------------------------------->|  ACK(PID=2,LargestAcked=1),    |
+  |                                |  STREAM("Response 2")])   -----|
+  | Pkt(DCID=A,PN=2,frames=[       |                 ----------|    |
+  |  ACK(PID=1, LargestAcked=2),   |       ----------|              |
+  |  ACK(PID=2, LargestAcked=1)])  |<------|                        |
+  |<-------------------------------|                                |
+  | Pkt(DCID=B,PN=3,frames=[       | Pkt(DCID=D,PN=2,frames=[       |
+  |  STREAM("Response 3")])        |  STREAM("Response 4")])        |
+  |------------------------------->|                            ----|
+  |                                |                   ---------|   |
+  |            ...                 |    ...  <---------|            |
 ~~~~~~~~~~
 {: #examplempquic title="Dataflow with Multipath QUIC"}
 
@@ -277,15 +275,16 @@ Establishment of a Multipath QUIC Connection
 --------------------------------------------
 
 A Multipath QUIC connection starts like a regular QUIC connection. A
-cryptographic handshake takes place over Stream ID 0 and follows the classical
-process {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. It is during that
-process that the multipath capability is negotiated between hosts. This is
-performed using the max_path_id transportparameter, where both hosts advertise
-the maximum number of paths, in addition to the first one, that they are able
-to use over the connection. The negotiated value will determine how many bytes
-will be used to encode the Path ID in frames. If one of the hosts does not
-advertise the max_path_id transport parameter, the negotiated value is 0,
-meaning that the QUIC connection will remain single-path.
+cryptographic handshake takes place with CRYPTO frames and follows the
+classical process {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. It is
+during that process that the multipath capability is negotiated between hosts.
+This is performed using the max_paths transport parameter, where both hosts
+advertise their support for the multipath extension, by indicating how many
+paths can be simultaneously in use. Any value different from 0 indicates that
+the host wants to support multipath over the connection. If one of the hosts
+does not advertise the max_paths transport parameter, the negotiated value is
+0, meaning that the QUIC connection will not use the multipath extension
+presented in this draft.
 
 The handshake is performed on a given path. This path is called the Initial
 path and is identified by Path ID 0.
@@ -299,35 +298,39 @@ paths. Each path is associated with a different four-tuple and identified by a
 Path ID, as shown in {{architectural}}.
 
 ~~~~~~~~~~
-          +---------------------------------------------+
-          |              Connection (MCID)              |
-          |   +--------+ +--------+ ... +------------+  |
-          |   | Path 0 | | Path 1 |     | Path N - 1 |  |
-          |   | Tuple  | | Tuple' | ... |   Tuple"   |  |
-          |   |  PCID  | |  PCID' |     |    PCID"   |  |
-          |   |  PN    | |  PN'   |     |    PN"     |  |
-          |   +--------+ +--------+ ... +------------+  |
-          +---------------------------------------------+
+          +-----------------------------------------------+
+          |           Connection (MSCID, MDCID)           |
+          |   +---------+ +---------+ ... +------------+  |
+          |   | Path 0  | | Path 1  |     | Path N - 1 |  |
+          |   | Tuple   | | Tuple'  | ... |   Tuple"   |  |
+          |   |  PSCID  | |  PSCID' |     |    PSCID"  |  |
+          |   |  PDCID  | |  PDCID' | ... |    PDCID"  |  |
+          |   |  PN     | |  PN'    |     |    PN"     |  |
+          |   +---------+ +---------+ ... +------------+  |
+          +-----------------------------------------------+
 ~~~~~~~~~~
 {: #architectural title="Architectural view of Multipath QUIC"}
 
 As described before, a Multipath QUIC connection starts on the Initial Path,
 identified by Path ID 0. For Multipath QUIC, this draft proposes two levels of
-Connection IDs. The first one is the Master Connection ID (MCID). It uniquely
-identifies the connection, as with the current QUIC design. The second one is
-the Path Connection ID (PCID). Packets belonging to a given path share the
-same PCID written in the Connection ID field of the public header. The PCID
-acts as an implicit path identifier for packets. Preventing the linkability of
-different paths is an important requirement for the multipath extension
-{{I-D.huitema-quic-mpath-req}}. Using PCID as implicit path identifier makes
-this linkability harder than having explicit signaling as in the previous
-version of this draft and does not require public header change to keep
-invariants {{I-D.ietf-quic-invariants}}. The MCID of a connection will be the
-PCID of the Initial Path. In the example of {{examplempquic}}, if the
-connection started on the WiFi network, then Connection ID A is both the PCID
-of the WiFi path and the MCID of the connection.
+asymetric Connection IDs. The first ones are the Master Connection IDs (MCIDs).
+Both the Master Source Connection ID (MSCID) and the Master Destination
+Connection ID (MDCID) uniquely identify the connection, as with the current
+QUIC design. The second ones are the Path Connection IDs (PCIDs). Packets
+belonging to a given path share the same Path Source Connection ID (PSCID) and
+Path Destination Connection ID (PDCID) written in the Connection ID field of
+the public header. The PCIDs act as the implicit path identifiers for packets.
+Preventing the linkability of different paths is an important requirement for
+the multipath extension {{I-D.huitema-quic-mpath-req}}. Using PCIDs as
+implicit path identifier makes this linkability harder than having explicit
+signaling as in the early version of this draft and does not require public
+header change to keep invariants {{I-D.ietf-quic-invariants}}. The MCIDs of a
+connection will be the PCIDs of the Initial Path. In the example of
+{{examplempquic}}, if the connection started on the WiFi network, then the
+Source Connection ID A is both the PSCID of the WiFi path and the MSCID of the
+connection.
 
-In addition to the PCID, some additional information is kept for each path.
+In addition to the PCIDs, some additional information is kept for each path.
 The Path ID identifies the path at the frame level and ensures uniqueness of
 the nonce (see {{nonce-considerations}} for details). A congestion window is
 maintained for each path. Hosts can also collect network measurements on a
@@ -337,38 +340,37 @@ per-path basis, such as round-trip-time measurements and lost packets.
 Path Establishment
 ------------------
 
-The max_path_id transport parameter exchanged during the cryptographic
-handshake determines an upper bound on the number of paths that can be created
-over the connection, in addition to the Initial one. Then, hosts must agree on
-which paths can be used, and with which Path Connection IDs. Unlike Multipath
-TCP {{RFC6824}}, the server dynamically controls how many paths can currently
-be in use. This can be done using a new MAX_PATHS frame indicating how many
-additional paths can be simultaneously in use.
+The max_paths transport parameter exchanged during the cryptographic handshake
+determines how many paths can be simultaneously used. The lowest advertised
+value is the negotiated one. Then, hosts must agree on which paths can be
+used, and with which Path Connection IDs. Unlike Multipath TCP {{RFC6824}},
+both hosts dynamically control how many paths can currently be in use, i.e.,
+the handshake only defines the initial value. This can be done using a new
+MAX_PATHS frame indicating how many paths can be simultaneously in use.
 
-The server proposes new paths with an extended version of the
-NEW_CONNECTION_ID frame (see {{newconnectionidsec}}). That frame proposes a
-PCID for a given Path ID. Once the client receives and acknowledges the frame,
-it can start using the new path by placing the PCID in the Connection ID field
-of the packets. The server can start using a path once the corresponding
-NEW_CONNECTION_ID has been acknowledged. Both hosts store the NEW_CONNECTION_ID
-information in order to cope with the remote trying to use a new path. As
-frames are encrypted, the establishment of new paths does not leak cleartext
-identifiers {{I-D.huitema-quic-mpath-req}}.
+Hosts propose new paths with an extended version of the NEW_CONNECTION_ID
+frame (see {{newconnectionidsec}}). This frame proposes an PDCID for a given
+Path ID. Once both hosts proposed a PDCID to their peer and received the
+acknowledgment for the related NEW_CONNECTION_ID, the path ID can be used to
+send packets. Both hosts store the NEW_CONNECTION_ID information in order to
+cope with the remote trying to use a new path. As frames are encrypted, the
+establishment of new paths does not leak cleartext identifiers
+{{I-D.huitema-quic-mpath-req}}.
 
 A server might provide more Path IDs with NEW_CONNECTION_ID frames than the
 value advertised in the MAX_PATHS frame. This can be useful to cope with
 migration cases, as described in {{path-migration}}. In such cases, hosts can
 only use a subset of the proposed Path IDs. Multipath QUIC is fully
 symmetrical. Both the client and the server can start using new paths once
-their corresponding PCID have been negotiated. It might happen that both hosts
+their corresponding PCIDs have been negotiated. It might happen that both hosts
 try to create paths with different Path IDs, such that there are more paths
 than the advertised number in MAX_PATHS frame. In that case, the paths with
 the lowest Path IDs will be used while the others will stop.
 
-The client is not able to create new paths as long as the server does not send
+Hosts are not able to create new paths as long as the peer does not send
 NEW_CONNECTION_ID and MAX_PATHS frames. To limit the latency of the path
-handshake, the server can send those frames just after the 0-RTT handshake
-packet.
+handshake, hosts should send those frames as soon as possible, i.e., just
+after the 0-RTT handshake packet.
 
 Although a path can be first used by any host, it might not be practical for
 one of the peers to send an initial packet on new paths. A possible cause is
@@ -399,21 +401,21 @@ advertised by the MAX_STREAM_DATA frame remain unchanged when there are
 multiple paths.
 
 However, Multipath QUIC might face reordering at packet-level when using paths
-having different latencies. The presence of the Path ID in the public header
+having different latencies. The presence of different Path Connection IDs
 ensures that the packets sent over a given path will contain monotonically
 increasing packet numbers. To ensure more flexibility and potentially to
 reduce the ACK block section of the ACK frame when aggregating bandwidth of
 paths exhibiting different network characteristics, each path keeps its own
 monotonically increasing Packet Number space. This potentially allows sending
-up to 2^32 * 2^62 packets on a QUIC connection since each path has its own
+up to 2^62 * 2^62 packets on a QUIC connection since each path has its own
 packet number space.
 
 The ACK frame is also modified to allow per-path packet acknowledgments. This
 remains compliant with the independence between packets and frames while
 providing more flexibility to hosts to decide on which path they want to send
 path acknowledgments. Looking again at {{examplempquic}}, packets that were
-sent over a given path (e.g., the response2 packet on path 2 with CID B) can
-be acknowledged on another path (here, path 1 with CID A) to limit the latency
+sent over a given path (e.g., the response2 packet on path 2 with DCID C) can
+be acknowledged on another path (here, path 1 with DCID A) to limit the latency
 due to ACK transmissions on high-latency paths. Such scheduling decision would
 not have been possible in Multipath TCP {{RFC6824}} which must acknowledge
 data on the path is was received on.
@@ -519,31 +521,30 @@ Multipath QUIC. Other coupled congestion control schemes have been proposed
 for Multipath TCP such as {{OLIA}}.
 
 
-Mapping Path ID to Connection ID
-================================
+Mapping Path ID to Connection IDs
+=================================
 
 As described in the overview section, hosts need to identify on which path
 packets are sent. The Path ID must then be inferred from the public header.
-This is done by using Path Connection ID in addition to the connection Master
-Connection ID.
+This is done by using Path Connection IDs in addition to Master Connection IDs.
 
-The Master Connection ID is determined during the cryptographic handshake and
-actually corresponds to the Connection ID in the current QUIC design
-{{I-D.ietf-quic-transport}}. The Path Connection ID of the Initial path (with
-Path ID 0) is equal to the Master Connection ID. The Path Connection ID of the
-other paths are determined when the NEW_CONNECTION_ID frames are exchanged.
+The Master Connection IDs is determined during the cryptographic handshake and
+actually corresponds to both Connection IDs in the current QUIC design
+{{I-D.ietf-quic-transport}}. The Path Connection IDs of the Initial path (with
+Path ID 0) are equal to the Master Connection IDs. The Path Connection IDs of
+the other paths are determined when the NEW_CONNECTION_ID frames are exchanged.
 
 The server MUST ensure that all advertised Path Connection IDs are available
 for the whole connection lifetime. Once it sends a NEW_CONNECTION_ID frame
-containing the PCID, the server can start receiving packets with the
-advertised Connection ID as belonging to the corresponding path. The server
-MUST wait until the reception of the frame acknowledgment before starting to
-send packets on that path.
+containing a PCID, the server can start receiving packets with the advertised
+Connection ID as belonging to the corresponding path. The server MUST wait
+until the reception of the frame acknowledgment before starting to send
+packets on that path.
 
 Upon reception of the NEW_CONNECTION_ID frame, the client MUST acknowledge it
-and MUST store the advertised Path Connection ID and the Path ID of the
-proposed path. It MUST ensure that it can receive packets coming from the
-server using the PCID and associate it with the corresponding Path ID.
+and MUST store the advertised Destination Path Connection ID and the Path ID
+of the proposed path. It MUST ensure that it can receive packets coming from
+the server using the PCID and associate it with the corresponding Path ID.
 
 
 Using Multiple Paths {#spec}
@@ -557,58 +558,27 @@ Multipath Negotiation
 ---------------------
 
 The Multipath Negotiation takes place during the cryptographic handshake with
-the max_path_id transport parameter. A QUIC connection is initially
-single-path in QUIC, and all packets prior to handshake completion MUST be
-exchanged over the Initial Path. During this process, hosts advertise the
-maximum path ID they are willing to use. The maximum path ID that can be used
-over a connection is the minimum of both advertised values. If one host does
-not send the max_path_id transport parameter during the cryptographic
-handshake, the remote MUST assume a value of 0, leading to a single-path
-connection over the Initial Path. NEW_CONNECTION_ID frames can later propose
-Path IDs in the range of max_path_id inclusive. If a client receives a
-NEW_CONNECTION_ID proposing a Path ID greater than the negotiated maximum
-value, it MUST trigger a CONNECTION_CLOSE frame with an error code set to 0x10b
-with a reason phrase describing this issue.
+the max_paths transport parameter. A QUIC connection is initially single-path
+in QUIC, and all packets prior to handshake completion MUST be exchanged over
+the Initial Path. During this process, hosts advertise their support for
+multipath operations. Any value different from 0 indicates that the host
+supports multipath operations over the connection. If one host does not send
+the max_paths transport parameter during the cryptographic handshake, the
+remote MUST assume a value of 0, leading to a single-path connection over the
+Initial Path. NEW_CONNECTION_ID frames can later propose Path IDs that can
+then be used for the connection.
 
 
 ### Transport Parameter Definition {#tp-definition}
 
 An endhost MAY use the following transport parameter:
 
-max_path_id (0x0020):
+max_paths (0x0020):
 
- :  The maximum path ID transport parameter indicates the number of paths in
-    addition to the Initial Path that the host agrees to support over the
-    connection, encoded as an unsigned 32-bit integer. This sets a upper bound
-    on the Path IDs that can be used. The default value for this parameter is
+ :  The maximum number of paths that can be simultaneously active, encoded
+    as an unsigned 16-bit integer. The default value for this parameter is
     0, meaning that a host omitting this transport parameter does not agree to
-    use multiple paths over the connection.
-
-
-Variable-Length Encoding of the Path ID {#variable-length-pid}
----------------------------------------
-
-From the negotiated maximum Path ID, hosts can infer the amount of bits
-required to encode the Path ID. If the maximum Path ID is 255, only one byte
-suffices. Similarly, if one of the hosts wants a single-path connection,
-either by advertising a max_path_id of 0 or by omitting it, the Path ID field
-should not be present.
-
-| Negotiated Max Path ID Range | Path ID Field Length (Bytes) |
-|:-----------------------------|:-----------------------------|
-| 0                            | 0                            |
-| 1-255                        | 1                            |
-| 256-65535                    | 2                            |
-| 65536-4294967295             | 4                            |
-{: #vle-pid-table title="Summary of Path ID Encodings"}
-
-The proposed encoding is summarized in {{vle-pid-table}}.
-
-Because of security considerations described in {{nonce-considerations}}, a
-host reusing packet numbers across paths must limit the number of advertised
-paths depending on the size of the Initial Value. In particular, a host MUST
-NOT advertise a max_path_id whose field length exceeds (Initial Value Length)
-- 8.
+    use the multipath extension over the connection.
 
 
 Coping with Additional Remote Addresses
@@ -640,7 +610,12 @@ state. The possible path states are depicted in {{path_state}}.
 ~~~~~~~~~~
 +----------+  
 | PROPOSED |
-+----------+               
++----------+      
+      | both hosts exchanged PCIDs for the path
+      v
++----------+
+|  READY   |
++----------+         
       |
       | path usage
       |
@@ -660,25 +635,26 @@ state. The possible path states are depicted in {{path_state}}.
 ~~~~~~~~~~
 {: #path_state title="Finite-State Machine of paths"}
 
-Once a path has been proposed in a NEW_CONNECTION_ID frame, it is in the
-PROPOSED state. In this situation, hosts MUST keep the following path
-information:
+Once a path has been proposed in a NEW_CONNECTION_ID frame, either sent or
+received, it is in the PROPOSED state. In this situation, hosts MUST keep the
+following path information:
 
 * Path ID: encoded as a 4-byte integer. It uniquely identifies the path in the
   connection. This value is immutable.
-* Master Connection ID: encoded as a 8-byte number. It makes the link between
-  the path and the QUIC connection it belongs to. This value is immutable.
-* Path Connection ID: encoded as a 8-byte integer. It makes the link between
-  the packet's Connection ID field and the path. This value can be updated
-  with subsequent NEW_CONNECTION_ID frames.
+* Master Connection IDs: they make the link between  the path and the QUIC    
+  connection it belongs to. These values are immutable.
+* Path Connection IDs: they make the link between the packet's Connection ID
+  field and the path. This value can be updated with subsequent
+  NEW_CONNECTION_ID frames.
 * Path State: the current state of the path, one of the values presented in
   {{path_state}}.
 
-Hosts MUST ensure that they can associate a packet with the PCID and its
-corresponding path at any time, as they must be ready to figure out the path
-used by the remote host.
+Once both hosts exchanged both asymetric PCIDs for a given Path ID, the path
+enters the READY state. In this state, hosts MUST ensure that they can
+associate a packet with the PCIDs and its corresponding path at any time, as
+they must be ready to figure out the path used by the remote host.
 
-Either the host received a packet with the corresponding PCID coming from a
+Either the host received a packet with the corresponding PCIDs coming from a
 validated address or it wants to start using the path to a validated address,
 the path goes to the ACTIVE state. This is the state where a path can be used
 to send and receive packets. In addition to the fields required in the PROPOSED
@@ -728,30 +704,18 @@ CLOSED path reuse.
 Dynamic Management of Paths
 ---------------------------
 
-The server is the main protagonist in determining how many paths can be used
-over a Multipath QUIC connection. It is its reponsibility to propose Path IDs
-with corresponding PCIDs that could be used by the client. In addition, it
-dynamically controls the number of active paths that can be used for the
-connection. This is performed by sending the MAX_PATHS frame that sets an
-upper limit on the number of additional active paths. A host can propose more
-Path IDs with NEW_CONNECTION_ID frames than the number of additional paths it
-agrees to use simultaneously. This can be useful in migration scenarios, where
-the server wants to share a pool of Path IDs that can be directly used to
+Both hosts determine how many paths can be used over a Multipath QUIC
+connection. It is their reponsibility to propose Path IDs with corresponding
+PCIDs that could be used by the peer. In addition, they dynamically control
+the number of active paths that can be used for the connection, initially
+determined during the handshake with the max_paths transport parameter. This
+is performed by sending MAX_PATHS frames that set an upper limit on the number
+of active paths. At any time, the maximum number of active paths that could be
+present over a connection is the minimum value advertised by peers. A host can
+propose more Path IDs with NEW_CONNECTION_ID frames than the number of paths
+it agrees to use simultaneously. This can be useful in migration scenarios,
+where the host wants to share a pool of Path IDs that can be directly used to
 migrate paths.
-
-As long as no MAX_PATHS frame was received from the server, the client MUST
-assume that only one path can be used. At the beginning of the QUIC connection,
-this means that only the Initial Path can be used. In this case however,
-during the connection, another path can be used, but the Initial Path MUST
-have been migrated to it. The server can then increase the value advertised in
-the MAX_PATHS frame to allow hosts to use new paths among the proposed Path ID
-pool.
-
-By default, the client does not set any limit to the number of paths which can
-be used. If a client wants to limit the number of (additional) paths the server
-can use, it can also send a MAX_PATHS frame. In this case, the number of
-additional paths that can be used over the connection is the minimum between
-last advertised value from both sides.
 
 A host can also decrease the number of paths that can be used over a
 connection. If this value decreases below the current number of active paths,
@@ -844,13 +808,11 @@ The NEW_CONNECTION_ID is as follows:
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          Path ID  (j)                       ...
+|                          Path ID  (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                                                               |
-+                        Connection ID (64)                     +
-|                                                               |
+|   Length (8)  |          Connection ID (32..144)            ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                                                               |
 +                                                               +
@@ -867,27 +829,19 @@ Compared to the frame specified in {{I-D.ietf-quic-transport}}, a Path ID
 field of variable size is prefixed to associate the Path ID with the Connection
 ID. If the multipath extension was not negotiated during the connection
 establishment, the NEW_CONNECTION_ID frame is the same as the one presented in
-{{I-D.ietf-quic-transport}}. This frame MUST only be sent by the server. Upon
-reception of the frame with a specified path ID, the client can start using
-the new path with the matching Connection ID.
+{{I-D.ietf-quic-transport}}. This frame can be sent by both hosts. Upon
+reception of the frame with a specified path ID, the peer can update the related path state either to PROPOSED or READY and store the communicated Connection ID as the Destination Connection ID of the path.
 
-A host MUST NOT start using a path if no related NEW_CONNECTION_ID frame has
-been received (at client side) or acknowledged (at server side). To limit the
-delay of the multipath usage upon handshake completion, the server SHOULD send
-NEW_CONNECTION_ID frames for paths it allows using as soon the connection
+A host MUST NOT start using a path as long as both peers have not proposed
+their Destination Connection ID with NEW_CONNECTION_ID frames. To limit the
+delay of the multipath usage upon handshake completion, hosts SHOULD send
+NEW_CONNECTION_ID frames for paths they allow using as soon the connection
 establishment completes.
 
 To cope with privacy issues, it should be hard to make the link between two
 different connections or two different paths of a same connection by just
 looking at the Connection ID contained in packets. Therefore, Path Connection
-IDs chosen by the server MUST be random.
-
-It might happen that a server proposes a Connection ID in a NEW_CONNECTION_ID
-frame that is already in use by the client for another connection with another
-server. In such cases, the client MUST warn the server that this Connection ID
-is not available and ask for another Connection ID. This request for asking
-another Connection ID for a particular path will follow the same mechanism as
-described in {{I-D.ietf-quic-transport}}.
+IDs chosen by hosts MUST be random.
 
 
 ACK Frame
@@ -899,7 +853,7 @@ The format of the modified ACK frame is shown below.
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                           Path ID (j)                       ...
+|                           Path ID (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                    Largest Acknowledged (i)                 ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -921,6 +875,9 @@ the ACK frame is the same as the one presented in {{I-D.ietf-quic-transport}}.
 Since frames are independent of packets, and the path notion relates to the
 packets, the ACK frames can be sent on any path, unlike Multipath TCP
 {{RFC6824}} which is constrained to send ACKs on the same path.
+
+Although not defined in this document, a similar adaptation for the ACK_ECN
+frame is also possible.
 
 
 New Frames
@@ -1157,10 +1114,10 @@ computation is now performed as follows. The nonce, N, is formed by combining
 the packet protection IV (either client_pp_iv_n or server_pp_iv_n) with the
 Path ID and the packet number. The 64 bits of the reconstructed QUIC packet
 number in network byte order is left-padded with zeros to the size of the IV.
-The Path ID encoded in its variable-length format described in
-{{variable-length-pid}} is right-padded with zeros to the size of the IV. The
-Path IV is computed as the exclusive OR of the padded Path ID and the IV. The
-exclusive OR of the padded packet number and the Path IV forms the AEAD nonce.
+The Path ID encoded in its variable-length format is right-padded with zeros
+to the size of the IV. The Path IV is computed as the exclusive OR of the
+padded Path ID and the IV. The exclusive OR of the padded packet number and
+the Path IV forms the AEAD nonce.
 
 
 Validation of Exchanged Addresses {#validation_address}
@@ -1189,7 +1146,7 @@ the "QUIC Transport Parameters" registry under the "QUIC Protocol" heading.
 
 | Value  | Parameter Name | Specification     |
 |:-------|:---------------|:------------------|
-| 0x0020 | max_path_id    | {{tp-definition}} |
+| 0x0020 | max_paths      | {{tp-definition}} |
 {: #iana-tp-table title="Addition to QUIC Transport Parameters Entries"}
 
 
@@ -1198,9 +1155,10 @@ Acknowledgements
 
 We would like to thanks Masahiro Kozuka and Kazuho Oku for their numerous
 comments on the first version of this draft. We also thanks Philipp Tiesel for
-his early comments that led to the current design. We also want to thanks
-Christian Huitema for his draft about multipath requirements to identify
-critical elements about the multipath feature.
+his early comments that led to the current design, and Ian Swett for later
+feedbacks. We also want to thanks Christian Huitema for his draft about
+multipath requirements to identify critical elements about the multipath
+feature.
 
 
 --- back
@@ -1208,8 +1166,17 @@ critical elements about the multipath feature.
 Change Log
 ==========
 
+Since draft-deconinck-quic-multipath-00
+---------------------------------------
+
+- Comply with asymetric Connection IDs
+- Add max_paths transport paramter to negotiate initial number of active paths
+- Path ID as a regular varint
+- Remove max_path_id transport parameter
+- Updated text to match draft-ietf-quic-transport-14
+
 Since draft-deconinck-multipath-quic-00
--------------------------------
+---------------------------------------
 
 - Added PATH_UPDATE frame
 - Added MAX_PATHS frame
