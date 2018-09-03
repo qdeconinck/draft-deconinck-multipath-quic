@@ -490,7 +490,7 @@ However, both server and client might want to change the path used on the
 cellular address for privacy concerns. If the server provides an additional
 path (e.g., Path ID 42) through NEW_CONNECTION_ID frame at the beginning of
 the connection, the client can perform the path change directly and avoid
-using the Initial Path Path Connection ID on the cellular network. This can be
+using the Initial Path Connection ID on the cellular network. This can be
 done using the PATH_UPDATE frame. It can indicate that the host stopped to use
 the Initial Path to use Path ID 42 instead. This frame is placed in the first
 packet sent to the new path with its corresponding PCID. The client can then
@@ -584,7 +584,7 @@ max_paths (0x0020):
 Coping with Additional Remote Addresses
 ---------------------------------------
 
-The usage of multiple networks paths if often done using multiple IP
+The usage of multiple networks paths is often done using multiple IP
 addresses. For instance, a smartphone willing to use both WiFi and LTE will
 use the corresponding addresses provided by the networks. It can then safely
 send packets to a previously-used IP address of a server. The server can
@@ -901,7 +901,7 @@ for the MAX_PATHS frame is 0x20. A MAX_PATHS frame is shown below.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                 Num Additional Active Paths (j)             ...
+|                 Num Additional Active Paths (i)             ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
 {: #max_paths_frame title="MAX_PATHS Frame"}
@@ -933,9 +933,9 @@ PATH_UPDATE is 0x21. A PATH_UPDATE frame is shown below.
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                        Closed Path ID (j)                   ...
+|                        Closed Path ID (i)                   ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Proposed Path ID (j)                  ...
+|                       Proposed Path ID (i)                  ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
 {: #migrate_path_frame title="MIGRATE_PATH Frame"}
@@ -1041,7 +1041,7 @@ format of the PATHS frame is shown below.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                        ActivePaths (j)                      ...
+|                        ActivePaths (i)                      ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                     Path Info Section (*)                   ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -1067,13 +1067,13 @@ The PATHS frame contains the following fields:
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Path ID 0 (j)                       ...
+|                         Path ID 0 (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |LocAddrID 0 (8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
                                ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Path ID N (j)                       ...
+|                         Path ID N (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |LocAddrID N (8)|
 +-+-+-+-+-+-+-+-+
