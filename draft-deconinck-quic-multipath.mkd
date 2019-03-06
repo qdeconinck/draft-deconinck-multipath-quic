@@ -1,7 +1,7 @@
 ---
 title: Multipath Extensions for QUIC (MP-QUIC)
 abbrev: MP-QUIC
-docname: draft-deconinck-quic-multipath-01
+docname: draft-deconinck-quic-multipath-02
 date: today
 category: std
 updates:
@@ -41,7 +41,7 @@ informative:
   RFC7225:
   RFC8041:
   Cellnet:
-     title: "Exploring Mobile/WiFi Handover with Multipath TCP"
+     title: "Exploring Mobile/Wi-Fi Handover with Multipath TCP"
      date: "2012"
      seriesinfo: "ACM SIGCOMM workshop on Cellular Networks (Cellnet'12)"
      author:
@@ -221,7 +221,7 @@ destination IP address, source port, destination port). Considering a smartphone
 interacting with a single-homed server, the smartphone might want to use
 one path over the WLAN network and another over the cellular one. Those paths
 are not necessarily disjoint. For example, when interacting with a dual-stack
-server, a smartphone may create two paths over the WiFi network, one over IPv4
+server, a smartphone may create two paths over the Wi-Fi network, one over IPv4
 and the other over IPv6.
 
 
@@ -234,7 +234,7 @@ placed in the public header of each QUIC packet. This enables hosts to continue
 the connection even if the 4-tuple changes due to, e.g., NAT rebinding. This
 ability to shift a connection from one 4-tuple to another is called Connection
 Migration. One of its use cases is fail-over when the IP address in use fails
-but another one is available. A device loosing the WLAN connectivity
+but another one is available. A device losing the WLAN connectivity
 can then continue the connection over its cellular interface, for instance.
 
 A QUIC connection can thus start on a given path, denoted as the initial path,
@@ -246,7 +246,7 @@ simultaneous usage of available paths for a given connection.
 
 This document fills that void. Concretely, instead of switching the 4-tuple
 for the whole connection, this draft first proposes mechanisms to communicate
-endhost addresses to the peer. It then leverage the address validation process
+endhost addresses to the peer. It then leverages the address validation process
 with the PATH_CHALLENGE and PATH_RESPONSE frames proposed in
 {{I-D.ietf-quic-transport}} to verify if additional addresses advertised by
 the communicating host are available and actually belong to it. In this case,
@@ -449,14 +449,14 @@ sent over a given path (e.g., the response2 packet on path 2 with DCID C) can
 be acknowledged on another path (here, path 1 with DCID A) to limit the latency
 due to ACK transmissions on high-latency paths. Such scheduling decision would
 not have been possible in Multipath TCP {{RFC6824}} which must acknowledge
-data on the path is was received on.
+data on the path it was received on.
 
 
 Exchanging Addresses
 --------------------
 
 When a multi-homed mobile device connects to a dual-stacked server using its IPv4
-address, it is aware of its local addresses (e.g., the WiFi and the cellular
+address, it is aware of its local addresses (e.g., the Wi-Fi and the cellular
 ones) and the IPv4 remote address used to establish the QUIC connection. If
 the client wants to create new paths over IPv6, it needs to learn the other
 addresses of the remote peer.
@@ -505,7 +505,7 @@ Coping with Address Removals
 
 During the lifetime of a QUIC connection, a host might lose some of its
 addresses. A concrete example is a smartphone going out of reachability of a
-WiFi network or shutting off one of its network interfaces. Such address
+Wi-Fi network or shutting off one of its network interfaces. Such address
 removals are advertised by using REMOVE_ADDRESS frames. The REMOVE_ADDRESS
 frame contains the Address ID of the lost address previously communicated
 through ADD_ADDRESS.
@@ -519,15 +519,15 @@ using a 4-tuple. To address privacy issues due to the linkability of addresses
 with Connection IDs, hosts should avoid changing the 4-tuple used by a path.
 There remain situations where this change is unavoidable. These can be
 categorized into two groups: host-aware changes (e.g., network handover from
-WiFi to cellular) and host-unaware changes (e.g., NAT rebinding).
+Wi-Fi to cellular) and host-unaware changes (e.g., NAT rebinding).
 
 For the host-aware case, let us consider the case of a Multipath QUIC
-connection where the client is a smartphone with both WiFi and cellular. It
+connection where the client is a smartphone with both Wi-Fi and cellular. It
 advertised both addresses and the server currently enables only one path, the
-initial one. The Initial Path uses the WiFi address. Then, for some reason,
-the WiFi address becomes unusable. To preserve connectivity, the client might
+initial one. The Initial Path uses the Wi-Fi address. Then, for some reason,
+the Wi-Fi address becomes unusable. To preserve connectivity, the client might
 then decide to use the cellular address for the Initial Path. It thus sends a
-REMOVE_ADDRESS announcing the loss of the WiFi address and a PATHS frame to
+REMOVE_ADDRESS announcing the loss of the Wi-Fi address and a PATHS frame to
 inform that the Initial Path is now using the cellular address. If the
 cellular address validation succeeds (which could have been done as soon as
 the cellular address was advertised), the server can continue exchanging data
@@ -555,7 +555,7 @@ server did not use the given PCID on that 4-tuple. Because some on-path devices
 may rewrite the source IP address to forward packets via the available network
 attachments (e.g., an host located behind a multi-homed CPE), the server may
 inadvertently conclude that a path is not anymore valid leading thus to
-freqently sending PATH_UPDATE frames as a function of the traffic distribution
+frequently sending PATH_UPDATE frames as a function of the traffic distribution
 scheme enforced by the on-path device. To prevent such behavior, the server
 SHOULD wait for at least X seconds to ensure this is about a connection
 migration and not a side effect of an on-path multi-interfaced device.
@@ -569,9 +569,9 @@ aggressively using a given path while available resources can be freely
 grabbed using existing paths, it is desirable to support a signal to indicate
 to a remote peer how it must place data into available paths. An approach may
 consist in indicating in an ADD_ADDRESS the type of the interface (e.g.,
-cellular, wlan, fixed): interface-type. The remote peer may rely on
+cellular, WLAN, fixed): interface-type. The remote peer may rely on
 interface-type to select the path to be used for sending data. For example,
-fixed interfaces will be preferred over wlan and cellular interfaces, and wlan
+fixed interfaces will be preferred over WLAN and cellular interfaces, and WLAN
 interface will be preferred over cellular interface.
 
 This information might also be used to avoid draining battery for some devices.
@@ -656,7 +656,7 @@ Coping with Additional Remote Addresses
 ---------------------------------------
 
 The usage of multiple networks paths is often done using multiple IP
-addresses. For instance, a smartphone willing to use both WiFi and LTE will
+addresses. For instance, a smartphone willing to use both Wi-Fi and LTE will
 use the corresponding addresses assigned by these networks. It can then safely
 send packets to a previously-used IP address of a server. The server can
 receive packets sourced with different IP addresses, but it MUST first
@@ -767,7 +767,7 @@ UNUSABLE state can go into ACTIVE state, but its congestion window MUST be
 restarted and its performance metrics SHOULD be reset.
 
 Eventually, a path may either be migrated to another one or closed. This is
-signalled by the PATH_UPDATE frame. In that case, the path is in CLOSED state.
+signaled by the PATH_UPDATE frame. In that case, the path is in CLOSED state.
 In that state, packets MUST NOT be sent or received over it. A host MUST keep
 the same path state field as in the PROPOSED state, to avoid ambiguities and
 CLOSED path reuse.
@@ -884,7 +884,9 @@ The NEW_CONNECTION_ID is as follows:
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   Length (8)  |          Connection ID (32..144)            ...
+|   Length (8)  |                                               |
++-+-+-+-+-+-+-+-+         Connection ID (32..144)               +
+|                                                             ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                                                               |
 +                                                               +
@@ -895,7 +897,7 @@ The NEW_CONNECTION_ID is as follows:
 |                                                               |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
-{: #newconnectionid title="NEW_CONNECTION_ID adapted to Multipath QUIC"}
+{: #newconnectionid title="NEW_CONNECTION_ID frame adapted to Multipath QUIC"}
 
 Compared to the frame specified in {{I-D.ietf-quic-transport}}, a Path ID
 field of variable size is prefixed to associate the Path ID with the Connection
@@ -916,6 +918,32 @@ looking at the Connection ID contained in packets. Therefore, Path Connection
 IDs chosen by hosts MUST be random.
 
 
+RETIRE_CONNECTION_ID Frame
+--------------------------
+
+The RETIRE_CONNECTION_ID frame (type=0x19) as defined by
+{{I-D.ietf-quic-transport}} still allows an endpoint to indicate that it
+will no longer use a connection ID that was issued by its peer. The
+multipath extensions link Connection IDs to paths. Therefore, this frame
+should contains the Path ID on which it applies.
+
+The format of the adapted RETIRE_CONNECTION_ID is shown below.
+
+~~~~~~~~~~
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                          Path ID  (i)                       ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                      Sequence Number (i)                    ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+~~~~~~~~~~
+{: #retireconnectionid title="RETIRE_CONNECTION_ID frame adapted to Multipath QUIC"}
+
+The frame is handled as described in {{I-D.ietf-quic-transport}} on a
+path basis.
+
+
 ACK Frame
 ---------
 
@@ -925,18 +953,22 @@ The format of the modified ACK frame is shown below.
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                           Path ID (i)                       ...
+|                          Path ID (i)                        ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                    Largest Acknowledged (i)                 ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          ACK Delay (i)                      ...
+|                         ACK Delay (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       ACK Block Count (i)                   ...
+|                      ACK Range Count (i)                    ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          ACK Blocks (*)                     ...
+|                      First ACK Range (i)                    ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         ACK Ranges (*)                      ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                         [ECN Counts]                        ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
-{: #ack_frame title="ACK Frame adapted to Multipath"}
+{: #ack_frame title="ACK frame adapted to Multipath"}
 
 Compared to the ACK frame in the current QUIC design
 {{I-D.ietf-quic-transport}}, the ACK frame is prefixed by a variable size Path
@@ -947,9 +979,6 @@ the ACK frame is the same as the one presented in {{I-D.ietf-quic-transport}}.
 Since frames are independent of packets, and the path notion relates to the
 packets, the ACK frames can be sent on any path, unlike Multipath TCP
 {{RFC6824}} which is constrained to send ACKs on the same path.
-
-Although not defined in this document, a similar adaptation for the ACK_ECN
-frame is also possible.
 
 
 New Frames
@@ -1065,7 +1094,7 @@ The ADD_ADDRESS frame contains the following fields:
 * Interface Type: used to provide an indication about the interface type to
   which this address is bound. The following values are defined:
    o 0: fixed. Used as default value.
-   o 1: wlan
+   o 1: WLAN
    o 2: cellular
 
 * IP Address: the advertised IP address, in network order.
@@ -1134,7 +1163,7 @@ The PATHS frame contains the following fields:
 
 * ActivePaths: the current number of additional paths considered as being
   active from the sender point of view, i.e., (the number of active paths -
-  1). ActivePaths MUST be lower or equal to the last value advertised by
+  1). ActivePaths MUST be smaller or equal to the last value advertised by
   MAX_PATHS frame.
 
 * Path Info Section: contains information about all the active paths (i.e.,
@@ -1234,7 +1263,7 @@ Acknowledgements
 We would like to thanks Masahiro Kozuka and Kazuho Oku for their numerous
 comments on the first version of this draft. We also thanks Philipp Tiesel for
 his early comments that led to the current design, and Ian Swett for later
-feedbacks. We also want to thanks Christian Huitema for his draft about
+feedbacks. We also want to thank Christian Huitema for his draft about
 multipath requirements to identify critical elements about the multipath
 feature. Mohamed Boucadair provided lot of useful inputs on the second version
 of this document.
@@ -1245,11 +1274,19 @@ of this document.
 Change Log
 ==========
 
+Since draft-deconinck-quic-multipath-01
+---------------------------------------
+
+- Include path policies considerations
+- Add practical considerations thanks to Mohamed Boucadair inputs
+- Adapt the RETIRE_CONNECTION_ID frame
+- Updated text to match draft-ietf-quic-transport-18
+
 Since draft-deconinck-quic-multipath-00
 ---------------------------------------
 
-- Comply with asymetric Connection IDs
-- Add max_paths transport paramter to negotiate initial number of active paths
+- Comply with asymmetric Connection IDs
+- Add max_paths transport parameter to negotiate initial number of active paths
 - Path ID as a regular varint
 - Remove max_path_id transport parameter
 - Updated text to match draft-ietf-quic-transport-14
