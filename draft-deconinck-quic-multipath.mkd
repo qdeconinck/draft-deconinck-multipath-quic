@@ -179,10 +179,10 @@ the special meaning defined in {{RFC2119}}.
 We assume that the reader is familiar with the terminology used in
 {{I-D.ietf-quic-transport}}. In addition, we define the following terms:
 
-- Path: A logical association seen by a QUIC host to reach its peer, on which packets can be sent. It is typically characterized by (Source IP Address, Source Port Number, Destination IP Address, Destination Port Number). A path is unidirectional and asymmetric, similar to the Connection IDs. A path is internally identified by using a Path ID and uses a potentially changing Connection ID identifying the parent connection in packets exchaged on that path.
+- Path: A logical association seen by a QUIC host to reach its peer, on which packets can be sent. It is typically characterized by (Source IP Address, Source Port Number, Destination IP Address, Destination Port Number). A path is unidirectional, similar to the Connection IDs. A path is internally identified by using a Path ID and uses a potentially changing Connection ID identifying the parent connection in packets exchaged on that path.
 
-- Initial Path: The path used by the peer for the establishment of the QUIC connection.
-  The cryptographic handshake is done on this path. It is identified
+- Initial Paths: The paths used by peers for the establishment of the QUIC connection.
+  The cryptographic handshake is done on these paths. These are identified
   by Path ID 0.
 
 
@@ -212,7 +212,7 @@ What is a Path?
 ---------------
 
 Before going into details, let us first define what is called a "path". Since
-the early days of computer networks, a path was denoted by a 4-tuple (Source IP Address, Source Port Number, Destination IP Address, Destination Port Number). It is namely a UDP road from the local host to the remote one. Considering a smartphone interacting with a single-homed server, the smartphone might want to use one path over the WLAN network and another over the cellular one. Those paths are not necessarily disjoint. For example, when interacting with a dual-stack server, a smartphone may create two paths over the Wi-Fi network, one over IPv4 and the other over IPv6. However, the networking experiences showed that packets following a direction do not always share the same track as the packets in the opposite direction. Therefore, QUIC paths are host-specific, i.e., the path from A to B is different from the one from B to A. This potentially enables the use of unidirectional networks such as sattelites, unapplicable when using TCP.
+the early days of computer networks, a path was denoted by a 4-tuple (Source IP Address, Source Port Number, Destination IP Address, Destination Port Number). It is namely a UDP road from the local host to the remote one. Considering a smartphone interacting with a single-homed server, the smartphone might want to use one path over the WLAN network and another over the cellular one. Those paths are not necessarily disjoint. For example, when interacting with a dual-stack server, a smartphone may create two paths over the Wi-Fi network, one over IPv4 and the other over IPv6. However,  networking experiences showed that packets following a direction do not always share the same road as the packets in the opposite direction. Therefore, QUIC paths are host-specific, i.e., the path from A to B is different from the one from B to A. This potentially enables the use of unidirectional networks such as sattelites, unapplicable when using TCP.
 
 
 Beyond Connection Migration
@@ -227,10 +227,10 @@ Migration. One of its use cases is fail-over when the IP address in use fails
 but another one is available. A device losing the WLAN connectivity
 can then continue the connection over its cellular interface, for instance.
 
-A QUIC participant can thus start on a given path, denoted as the initial path,
+A QUIC peer can thus start on a given path, denoted as the initial path,
 and end on another one.
 However, the current QUIC design {{I-D.ietf-quic-transport}} assumes that only
-one path is in use for a given connection. 
+one symmetric path is in use for a given connection. 
 The specification does not support means to distinguish path migration from
 simultaneous usage of available asymmetric paths for a given connection.
 
@@ -292,10 +292,10 @@ A Multipath QUIC connection starts like a regular QUIC connection. A
 cryptographic handshake takes place with CRYPTO frames and follows the
 classical process {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. It is
 during that process that the multipath capability is negotiated between hosts.
-This is performed using the multipath_enabled transport parameter, where both hosts
+This is performed using the max_sending_paths transport parameter, where both hosts
 advertise their support for the multipath extension. Any value different from 0
 indicates that the host wants to support multipath over the connection. If one of the hosts
-does not advertise the multipath_enabled transport parameter, the negotiated value is
+does not advertise the max_sending_paths transport parameter, the negotiated value is
 0, meaning that the QUIC connection will not use the multipath extensions
 presented in this document.
 
@@ -355,14 +355,14 @@ per-path basis, such as one-way delay measurements and lost packets.
 Path Establishment
 ------------------
 
-The multipath_enabled transport parameter exchanged during the cryptographic handshake
+The max_sending_paths transport parameter exchanged during the cryptographic handshake
 determines if multiple paths can be used. Then, hosts provide to their peer the Path
 Connection ID to use on asymmetric paths. Unlike Multipath TCP {{RFC6824}},
 both hosts dynamically control how many sending paths can currently be in use by the peer, i.e.,
 the number of different Path IDs proposed to the peer. Notice that the peers might advertise
 a different number of sending Path IDs to their peer, setting different limits to the sending
-and receive paths of each host. The multipath_enabled transport parameter can indicate the
-number of sending paths the host would like to receive from the peer.
+and receive paths of each host. The max_sending_paths transport parameter indicates the
+maximum number of sending paths the host would support to receive from the peer.
 
 Hosts propose new receive paths with an extended version of the NEW_CONNECTION_ID
 frame (see {{newconnectionidsec}}). This frame provides to the peer the PDCID for a given
@@ -380,8 +380,8 @@ NEW_CONNECTION_ID frames. To limit the latency of the path
 handshake, hosts should send those frames as soon as possible, i.e., just
 after the 0-RTT handshake packet.
 
-Although sending paths can be first used by any host, it might not be practical for
-one of the peers to send an initial packet on new sending paths. A possible cause is
+Sending useful data on a fresh new sending path might lead to poor performance
+as the network path used by the QUIC path is not usable yet. A typical case is
 when a server wants to initiate a new path to a client behind a NAT. The
 client would possibly never receive this packet, leading to connectivity
 issues on that path. To avoid such issues, a remote address MUST have been
@@ -391,7 +391,7 @@ advertised.
 
 Because attaching to new networks may be volatile and an endpoint does not
 have full visibility on multiple paths that may be available (e.g., hosts
-connected to a CPE), an MP-QUIC capable endhost SHOULD advertise a multipath_enabled
+connected to a CPE), an MP-QUIC capable endhost SHOULD advertise a max_sending_paths
 value of at least 4 and SHOULD propose at least 4 receive paths to its peer.
 
 Exchanging Data over Multiple Paths
@@ -615,13 +615,13 @@ Multipath Negotiation
 ---------------------
 
 The Multipath Negotiation takes place during the cryptographic handshake with
-the multipath_enabled transport parameter. A QUIC connection is initially single-path
+the max_sending_paths transport parameter. A QUIC connection is initially single-path
 in QUIC, and all packets prior to handshake completion MUST be exchanged over
 the Initial Path. During this process, hosts advertise their support for
 multipath operations. Any value different from 0 indicates that the host
 supports multipath operations over the connection, i.e., the extensions defined
 in this document (not to be mixed with the availability of local multiple
-paths). If a host does not send the multipath_enabled transport parameter during the
+paths). If a host does not send the max_sending_paths transport parameter during the
 cryptographic handshake, the remote MUST assume a value of 0, leading to a
 single-path connection over the Initial Path. If both hosts advertise their
 support of the multipath extensions, NEW_CONNECTION_ID frames can later
@@ -632,7 +632,7 @@ propose Path IDs that can then be used for the connection.
 
 An endhost MAY use the following transport parameter:
 
-multipath_enabled (0x0020):
+max_sending_paths (0x0020):
 
  :  Indicate the support of the multipath extension presented in this document, encoded
     as an unsigned 8-bit integer. Any value different from 0 indicates support of the
@@ -669,6 +669,9 @@ When proposing asymmetric paths to the peer, hosts maintain some state for
 their receive paths. The possible receive path states are depicted in {{rcv_path_state}}.
 
 ~~~~~~~~~~
+      o
+      | send first NEW_CONNECTION_ID with the associated Path ID 
+      v
  +--------+
  | ACTIVE |
  +--------+
@@ -688,7 +691,7 @@ associate a packet with the PCID and its corresponding receive path at any time,
 they must be ready to figure out the path used by the remote host. ACTIVE is the state
 where the receive path can be used to receive packets.
 
-Eventually, a receive path may either be migrated to another one or closed. This is
+Eventually, a receive path may be closed. This is
 signaled by the reception of a PATH_UPDATE frame. In that case, the path is in CLOSED state.
 In that state, packets MUST NOT be received over it. A host MUST keep
 some minimal receive path state to avoid ambiguities and CLOSED path reuse.
@@ -732,19 +735,23 @@ paths. Information about the sending path that hosts are required to store depen
 state. The possible sending path states are depicted in {{snd_path_state}}.
 
 ~~~~~~~~~~
+      o
+      | receive a first NEW_CONNECTION_ID with the associated Path ID
+      v
 +----------+
 |  READY   |
 +----------+         
       |
       | path usage or PATH_UPDATE
       |
-      v      
- +--------+
- | ACTIVE |  
- +--------+
-      |
+      v      reception or sending of REMOVE_ADDRESS
+ +--------+ -------------------------------------> +----------+
+ | ACTIVE |            4-tuple validated           | DISABLED |
+ +--------+ <------------------------------------- +----------+
+      |                                                  |
+      +---------------------------------------------------
+      | 
       | sending PATH_UPDATE
-      |
       v
  +--------+
  | CLOSED |
@@ -768,7 +775,8 @@ following sending path information:
 
 When the host wants to start using the path over a validated address, the path
 goes to the ACTIVE state. This is the state where a sending path can be used
-to send packets. In addition to the fields required in the READY
+to send packets. Having a path in ACTIVE state only guarantees that it can be used,
+but the host is not forced to. In addition to the fields required in the READY
 state, the following elements MUST be tracked:
 
 * Packet Number Space: each sending path is associated with its own monotonically
@@ -790,14 +798,13 @@ state, the following elements MUST be tracked:
 
 It might happen that a sending path is temporarily unavailable, because one of the
 endpoint's addresses is no more available or because the server decided to
-decrease the number of active paths. In such cases, the path still remains in ACTIVE
-state, but the host does not send packets on it. If it is because a REMOVE_ADDRESS was
-received for the remote Address ID of the sending path,
-the host SHOULD validate the remote address first before reusing it. If this
-validation succeeds, the sending path can be used again, but its congestion window MUST be
-restarted and its performance metrics SHOULD be reset.
+decrease the number of active paths. In such cases, the path goes to the DISABLED
+state. In that state, the host MUST NOT send packets on it. At this state, the
+host might want to restart using the path over a validated 4-tuple, switching the
+path state back to ACTIVE state. However, its congestion window MUST be restarted
+and its performance metrics SHOULD be reset.
 
-Eventually, a sending path may either be migrated to another one or closed. This is
+Eventually, a sending path may be closed. This is
 signaled by the PATH_UPDATE frame. In that case, the sending path is in CLOSED state.
 In that state, packets MUST NOT be sent  over it. A host MUST keep the same path state
 field as in the READY state, to avoid ambiguities and CLOSED path reuse.
@@ -849,9 +856,9 @@ paths in use. This would limit the head-of-line blocking issue due to the
 transmission of the frames over a slow path.
 
 The sending path on which ACK frames are sent impacts the peer. The ACK frame is
-notably used to determine the latency of a combination of asymmetric path. If the ACK frame is sent on
-a given receive path it acknowledges, then the peer can compute the round-trip-time of the
-combination of its sending path with its receive one. The peer would compute the latency as the sum of the forward
+notably used to determine the latency of a combination of asymmetric path. In particular,
+the peer can compute the round-trip-time of the combination of its sending path with its receive one.
+The peer would compute the latency as the sum of the forward
 delay of the acknowledged path and the return delay of the path used to send
 the ACK frame. Choosing between acknowledging packets symmetrically (on path B to A if packet
 was sent on A to B) or not is up to the implementation. However, hosts SHOULD keep a
@@ -898,7 +905,7 @@ The NEW_CONNECTION_ID is as follows:
 |                      Retire Prior To (i)                    ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |   Length (8)  |                                               |
-+-+-+-+-+-+-+-+-+         Connection ID (32..144)               +
++-+-+-+-+-+-+-+-+         Connection ID                         +
 |                                                             ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                                                               |
@@ -1192,7 +1199,7 @@ The fields in the Path Info Section are:
 
 * LocAddrID: the local Address ID of the address currently used by the path.
 
-* LocAddrID: the remote Address ID of the address currently used by the path.
+* RemAddrID: the remote Address ID of the address currently used by the path.
 
 The Path Info section only contains the Local and Remote Address IDs so far, but this
 section can be extended later with other potentially useful information.
