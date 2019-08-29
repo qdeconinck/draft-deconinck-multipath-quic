@@ -1,7 +1,7 @@
 ---
 title: Multipath Extensions for QUIC (MP-QUIC)
 abbrev: MP-QUIC
-docname: draft-deconinck-quic-multipath-02
+docname: draft-deconinck-quic-multipath-03
 date: today
 category: std
 updates:
@@ -1273,7 +1273,8 @@ his early comments that led to the current design, and Ian Swett for later
 feedbacks. We also want to thank Christian Huitema for his draft about
 multipath requirements to identify critical elements about the multipath
 feature. Mohamed Boucadair provided lot of useful inputs on the second version
-of this document.
+of this document. Maxime Piraux helped us to improve the third version of this
+draft.
 
 
 --- back
