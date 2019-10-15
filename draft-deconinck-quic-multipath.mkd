@@ -763,7 +763,7 @@ Once a sending path has been proposed by the peer in a received NEW_CONNECTION_I
 frame, it is in the READY state. In this situation, hosts MUST keep the
 following sending path information:
 
-* Path ID: encoded as a 4-byte integer. It uniquely identifies the sending path in the
+* Path ID: encoded as a 8-byte integer. It uniquely identifies the sending path in the
   connection. This value is immutable.
 * Main Connection IDs: they make the link between the path and the QUIC    
   connection it belongs to. These values are immutable.
