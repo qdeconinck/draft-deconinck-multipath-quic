@@ -1,3 +1,7 @@
 *.xml
 *.txt
 *.pdf
+lib
+*~
+.targets.mk
+*.html

@@ -1,38 +1,29 @@
-xml2rfc ?= xml2rfc
-kramdown-rfc2629 ?= kramdown-rfc2629
-idnits ?= idnits
+MD_PREPROCESSOR := sed -e 's/{DATE}/$(shell date '+%Y-%m-%d')/g'
 
-draft := draft-deconinck-quic-multipath
-current_ver := $(shell git tag | grep "$(draft)" | tail -1 | sed -e"s/.*-//")
-ifeq "${current_ver}" ""
-next_ver ?= 00
+LIBDIR := lib
+include $(LIBDIR)/main.mk
+
+$(LIBDIR)/main.mk:
+ifneq (,$(shell git submodule status $(LIBDIR) 2>/dev/null))
+	git submodule sync
+	git submodule update $(CLONE_ARGS) --init
 else
-next_ver ?= $(shell printf "%.2d" $$((1$(current_ver)-99)))
+	git clone -q --depth 10 $(CLONE_ARGS) \
+	    -b master https://github.com/martinthomson/i-d-template $(LIBDIR)
 endif
-next := $(draft)-$(next_ver)
 
-.PHONY: latest submit
+latest:: lint
+.PHONY: lint
 
-latest: $(draft).txt $(draft).html
+PYTHON := $(shell which python3)
+ifeq ($(PYTHON),)
+PYTHON := $(shell which python)
+endif
 
-submit: $(next).txt
+ifneq ($(PYTHON),)
+lint::
+	@$(PYTHON) ./.lint.py $(addsuffix .md,$(drafts))
+endif
 
-idnits: $(next).txt
-	$(idnits) $<
-
-clean:
-	-rm -f $(draft).txt $(draft).html
-	-rm -f $(next).txt $(next).html
-	-rm -f $(draft)-[0-9][0-9].xml
-
-$(next).mkd: $(draft).mkd
-	sed -e"s/$(basename $<)-latest/$(basename $@)/" $< > $@
-
-%.xml: %.mkd
-	$(kramdown-rfc2629) $< > $@
-
-%.txt: %.xml
-	$(xml2rfc) $< $@
-
-%.html: %.xml
-	$(xml2rfc) $< $@
+show-next:
+	@echo $(drafts_next)

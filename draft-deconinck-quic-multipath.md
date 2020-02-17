@@ -103,12 +103,12 @@ informative:
     date: "Dec. 2017"
     seriesinfo: "13th International Conference on emerging Networking EXperiments and Technologies (CoNEXT 2017). http://multipath-quic.org"
     author:
-    -   
+    -
        ins: Q. De Coninck
     -
        ins: O. Bonaventure
   IETFJ:
-    title: "Multipath TCP Deployments"   
+    title: "Multipath TCP Deployments"
     date: "Nov. 2016"
     seriesinfo: "IETF Journal"
     author:
@@ -230,7 +230,7 @@ can then continue the connection over its cellular interface, for instance.
 A QUIC peer can thus start on a given path, denoted as the initial path,
 and end on another one.
 However, the current QUIC design {{I-D.ietf-quic-transport}} assumes that only
-one symmetric path is in use for a given connection. 
+one symmetric path is in use for a given connection.
 The specification does not support means to distinguish path migration from
 simultaneous usage of available asymmetric paths for a given connection.
 
@@ -242,7 +242,7 @@ with the PATH_CHALLENGE and PATH_RESPONSE frames proposed in
 the communicating host are available and actually belong to it. In this case,
 those addresses can be used to create new paths to spread packets over several
 networks following a traffic distribution policy that is out of scope of this
-document. 
+document.
 
 When multiple paths are available, different delays may be experienced as a
 function of the initial path selected for the establishment of the QUIC
@@ -670,7 +670,7 @@ their receive paths. The possible receive path states are depicted in {{rcv_path
 
 ~~~~~~~~~~
       o
-      | send first NEW_CONNECTION_ID with the associated Path ID 
+      | send first NEW_CONNECTION_ID with the associated Path ID
       v
  +--------+
  | ACTIVE |
@@ -701,7 +701,7 @@ path information:
 
 * Path ID: encoded as a 8-byte integer. It uniquely identifies the receive path in the
   connection. This value is immutable.
-* Main Connection IDs: they make the link between the path and the QUIC    
+* Main Connection IDs: they make the link between the path and the QUIC
   connection it belongs to. These values are immutable.
 * Source Path Connection IDs: it makes the link between the packet's Connection ID
   field and the receive path. This value can be updated by sending subsequent
@@ -714,7 +714,7 @@ In the ACTIVE state, the following elements MUST be tracked:
 * Packet Number Space: each receive path is associated with its own monotonically
   increasing packet number space, dedicated for the packet receptions. Packet number
   considerations described in {{I-D.ietf-quic-transport}} apply within a given receive path.
-* Current 4-tuple: the tuple (sIP, dIP, sport, dport) observed to receive  
+* Current 4-tuple: the tuple (sIP, dIP, sport, dport) observed to receive
   packets over this path. This value is mutable, because it might receive a
   packet with a different validated remote address and/or port than the one
   currently recorded. If an host observes a change in the 4-tuple of the receive path,
@@ -740,7 +740,7 @@ state. The possible sending path states are depicted in {{snd_path_state}}.
       v
 +----------+
 |  READY   |
-+----------+         
++----------+
       |
       | path usage or PATH_UPDATE
       |
@@ -750,7 +750,7 @@ state. The possible sending path states are depicted in {{snd_path_state}}.
  +--------+ <------------------------------------- +----------+
       |                                                  |
       +---------------------------------------------------
-      | 
+      |
       | sending PATH_UPDATE
       v
  +--------+
@@ -765,7 +765,7 @@ following sending path information:
 
 * Path ID: encoded as a 4-byte integer. It uniquely identifies the sending path in the
   connection. This value is immutable.
-* Main Connection IDs: they make the link between the path and the QUIC    
+* Main Connection IDs: they make the link between the path and the QUIC
   connection it belongs to. These values are immutable.
 * Path Connection IDs: they make the link between the packet's Connection ID
   field and the sending path. This value can be updated with subsequent
@@ -877,7 +877,7 @@ Modifications to QUIC frames
 The multipath extension allows hosts to send packets over multiple paths.
 Since nearly all QUIC frames are independent of packets, no change is
 required for most of them. The only exceptions are the NEW_CONNECTION_ID and
-the ACK frames. The NEW_CONNECTION_ID and RETIRE_CONNECTION_ID are modified to provide 
+the ACK frames. The NEW_CONNECTION_ID and RETIRE_CONNECTION_ID are modified to provide
 Destination Path Connection ID negotiation for each asymmetric path. The ACK frame
 contains packet-level information with the Largest Acknowledged field. Since the Packet Numbers are now
 associated to asymmetric paths, the ACK frame must contain the Path ID it acknowledges.
@@ -1310,7 +1310,7 @@ Since draft-deconinck-multipath-quic-00
 - Added PATH_UPDATE frame
 - Added MAX_PATHS frame
 - No more packet header change
-- Implicit Path ID notification using Connection ID and NEW_CONNECTION_ID   
+- Implicit Path ID notification using Connection ID and NEW_CONNECTION_ID
   frames
 - Variable-length encoding for Path ID
 - Updated text to match draft-ietf-quic-transport-10
