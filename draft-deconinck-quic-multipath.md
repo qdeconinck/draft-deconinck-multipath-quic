@@ -247,8 +247,8 @@ over them. Hence, all the paths of a Multipath TCP connection must be
 bidirectional. However, networking experiences showed that packets following
 a direction do not always share the exact same road as the packets in the
 opposite direction. Furthermore, QUIC does not require a network path to be
-bidirectional in order to be used. For this, let us consider the Figure
-{{examplequic}} below.
+bidirectional in order to be used. For this, let us consider the {{examplequic}}
+below.
 
 ~~~~~~~~~~
                   Probed flow IPc2 to IPs1
@@ -307,49 +307,57 @@ uniflows, and end on another ones. However, the current QUIC design
 a given connection. The specification does not support means to distinguish path
 migration from simultaneous usage of available uniflows for a given connection.
 
-This document fills that void. Concretely, instead of switching the 4-tuple
-for the whole connection, this draft first proposes mechanisms to communicate
+This document fills that void. Concretely, instead of switching the 4-tuple for
+the whole connection, this draft first proposes mechanisms to communicate
 endhost addresses to the peer. It then leverages the address validation process
 with the PATH_CHALLENGE and PATH_RESPONSE frames proposed in
-{{I-D.ietf-quic-transport}} to verify if additional addresses advertised by
-the communicating host are available and actually belong to it. In this case,
-those addresses can be used to create new paths to spread packets over several
+{{I-D.ietf-quic-transport}} to verify if additional addresses advertised by the
+communicating host are available and actually belong to it. In this case, those
+addresses can be used to initiate new uniflows to spread packets over several
 networks following a traffic distribution policy that is out of scope of this
 document.
 
-When multiple paths are available, different delays may be experienced as a
-function of the initial path selected for the establishment of the QUIC
-connection. The first version of the specification does not discuss considerations
-related to the selection of the initial path to place the connection.
+TODO: Add a companion document discussing the packet scheduling and path
+management considerations.
 
-The example of {{examplempquic}} shows a possible data exchange
-between a dual-homed client performing a request fitting in two packets and a
-single-homed server. Notice that the Path ID used by an host over a specific network is not necessarily the same as the one used by the remote peer. In the presented example, phone sends packets over WLAN on path 1 and over LTE on path 2, while the packets sent by the server over WLAN are on path 2 and over LTE are on path 1.
+When multiple paths are available, different delays may be experienced as a
+function of the initial network path selected for the establishment of the QUIC
+connection. The first version of the specification does not discuss
+considerations related to the selection of the initial path to place the
+connection.
+
+The example of {{examplempquic}} shows a possible data exchange between a
+dual-homed client performing a request fitting in two packets and a single-homed
+server. Notice that the Uniflow ID used by an host over a specific network path
+is not necessarily the same as the one used by the remote peer. In the presented
+example, the phone sends packets over WLAN on uniflow 1 and over LTE on uniflow
+2, while the packets sent by the server over WLAN are on uniflow 2 and over LTE
+are on uniflow 1.
 
 
 ~~~~~~~~~~
-Server                           Phone                           Server
-via WLAN                                                        via LTE
--------                         -------                           -----
-  | Pkt(DCID=B,PN=1,frames=[       |                                |
-  |  STREAM("Request (1/2)")])     | Pkt(DCID=D,PN=1,frames=[       |
-  |<-------------------------------|  STREAM("Request (2/2)")])     |
-  | Pkt(DCID=A,PN=1,frames=[       |--------                        |
-  |  ACK(PID=1,LargestAcked=1)])   |       |----------              |
-  |------------------------------->|                 |----------    |
-  | Pkt(DCID=A,PN=2,frames=[       |                           |--->|
-  |  STREAM("Response 1")])        | Pkt(DCID=C,PN=1,frames=[       |
-  |------------------------------->|  ACK(PID=2,LargestAcked=1),    |
-  |                                |  STREAM("Response 2")])   -----|
-  | Pkt(DCID=B,PN=2,frames=[       |                 ----------|    |
-  |  ACK(PID=2, LargestAcked=2),   |       ----------|              |
-  |  ACK(PID=1, LargestAcked=1)])  |<------|                        |
-  |<-------------------------------|                                |
-  | Pkt(DCID=A,PN=3,frames=[       | Pkt(DCID=D,PN=2,frames=[       |
-  |  STREAM("Response 3")])        |  STREAM("Response 4")])        |
-  |------------------------------->|                            ----|
-  |                                |                   ---------|   |
-  |            ...                 |    ...  <---------|            |
+Server                        Phone                        Server
+via WLAN                                                  via LTE
+-------                      -------                        -----
+  | Pkt(DCID=B,PN=1,frames=[    |                             |
+  |  STREAM("Request (1/2)")])  | Pkt(DCID=D,PN=1,frames=[    |
+  |<----------------------------|  STREAM("Request (2/2)")])  |
+  | Pkt(DCID=A,PN=1,frames=[    |--------                     |
+  |  ACK(UID=1,LargestAcked=1)])|       |----------           |
+  |---------------------------->|                 |--------   |
+  | Pkt(DCID=A,PN=2,frames=[    |                         |-->|
+  |  STREAM("Response 1")])     | Pkt(DCID=C,PN=1,frames=[    |
+  |---------------------------->|  ACK(UID=2,LargestAcked=1), |
+  |                             |  STREAM("Response 2")])  ---|
+  | Pkt(DCID=B,PN=2,frames=[    |                 ---------|  |
+  |  ACK(UID=2,LargestAcked=2), |       ----------|           |
+  |  ACK(UID=1,LargestAcked=1)])|<------|                     |
+  |<----------------------------|                             |
+  | Pkt(DCID=A,PN=3,frames=[    | Pkt(DCID=D,PN=2,frames=[    |
+  |  STREAM("Response 3")])     |  STREAM("Response 4")])     |
+  |---------------------------->|                         ----|
+  |                             |                   ------|   |
+  |            ...              |    ...  <---------|         |
 ~~~~~~~~~~
 {: #examplempquic title="Dataflow with Multipath QUIC"}
 
@@ -362,67 +370,111 @@ Establishment of a Multipath QUIC Connection
 --------------------------------------------
 
 A Multipath QUIC connection starts like a regular QUIC connection. A
-cryptographic handshake takes place with CRYPTO frames and follows the
-classical process {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. It is
-during that process that the multipath capability is negotiated between hosts.
-This is performed using the max_sending_paths transport parameter, where both hosts
-advertise their support for the multipath extension. Any value different from 0
-indicates that the host wants to support multipath over the connection. If one of the hosts
-does not advertise the max_sending_paths transport parameter, the negotiated value is
-0, meaning that the QUIC connection will not use the multipath extensions
-presented in this document.
+cryptographic handshake takes place with CRYPTO frames and follows the classical
+process {{I-D.ietf-quic-transport}} {{I-D.ietf-quic-tls}}. It is during that
+handshake that the multipath capability is negotiated between hosts. This is
+performed using the `max_sending_uniflow_id` transport parameter, where both
+hosts advertise their support for the multipath extension. When an host includes
+this transport parameter, it advertises its support of the multipath extensions
+over the connection. If one of the hosts does not advertise the
+`max_sending_uniflow_id` transport parameter, the QUIC connection will not use
+the multipath extensions presented in this document.
 
-The handshake is performed on a given path. This path is called the Initial
-path and is identified by Path ID 0.
+The handshake is performed on two given uniflows (one for each direction). These
+uniflows are called the Initial Uniflows and are identified by Uniflow ID 0.
+
+Notice that an host advertising a value of 0 for the `max_sending_uniflow_id`
+transport parameter indicates that it does not want additional uniflows to send
+packets, but it still supports the multipath extensions. Such situation might be
+useful when the host does not require multiple networks paths for packet sending
+but still wants to let the peer use multiple uniflows to reach it.
+
 
 Architecture of Multipath QUIC
 ------------------------------
 
-Once established, a Multipath QUIC connection is composed of two or more
-asymmetric paths. Each asymmetric path is associated with a different four-tuple and identified by a
-Path ID, as shown in {{architectural}}.
+To illustrate the architecture of a Multipath QUIC connection, consider the
+{{uniflowsexample}}.
 
 ~~~~~~~~~~
-          +-----------------------------------------------+
-          |           Connection (MSCID, MDCID)           |
-          |   +---------+ +---------+ ... +------------+  |
-          |   | Sending | | Sending | ... |  Sending   |  |
-          |   | Path 0  | | Path 1  |     | Path N - 1 |  |
-          |   | Tuple   | | Tuple'  | ... |   Tuple"   |  |
-          |   |  PDCID  | |  PDCID' | ... |    PDCID"  |  |
-          |   |  PN     | |  PN'    |     |    PN"     |  |
-          |   +---------+ +---------+ ... +------------+  |
-          |   +---------+ +---------+ ... +------------+  |
-          |   | Receive | | Receive | ... |  Receive   |  |
-          |   | Path 0  | | Path 1  |     | Path M - 1 |  |
-          |   | Tuple   | | Tuple'  | ... |   Tuple"   |  |
-          |   |  PSCID  | |  PSCID' |     |    PSCID"  |  |
-          |   |  PN     | |  PN'    |     |    PN"     |  |
-          |   +---------+ +---------+ ... +------------+  |
-          +-----------------------------------------------+
++--------+          CID A - Uniflow ID 1          +--------+
+|        | =====================================> |        |
+|        |          CID B - Uniflow ID 0          |        |
+|        | =====================================> |        |
+|        |                                        |        |
+| Client |          CID C - Uniflow ID 0          | Server |
+|        | <===================================== |        |
+|        |          CID D - Uniflow ID 1          |        |
+|        | <===================================== |        |
+|        |          CID E - Uniflow ID 2          |        |
++--------+ <===================================== +--------+
 ~~~~~~~~~~
-{: #architectural title="Architectural view of Multipath QUIC"}
+{: #uniflowsexample title="An example of uniflow distribution over a Multipath QUIC connection"}
 
-As described before, a Multipath QUIC connection starts on the Initial Path,
-identified by Path ID 0. For Multipath QUIC, this document proposes two levels of
-asymmetric Connection IDs. The first ones are the Main (or Primary) Connection IDs (MCIDs).
-Both the Main Source Connection ID (MSCID) and the Main Destination
-Connection ID (MDCID) uniquely identify the connection, as with the current
-QUIC design. The second ones are the Path Connection IDs (PCIDs), written in the Connection ID field of the public header. The PCIDs act as the path identifiers for packets. Depending on the direction of the path (either sending path or receiving one), the host keeps either the Path Source Connection ID (PSCID, for the receive paths) or the Path Destination Connection ID (PDCID, for the sending paths). Notice that the PDCID of a sending path of an host is the same as the PSCID of the corresponding receive path of the remote. Preventing the linkability of different paths is an important requirement for
-the multipath extension {{I-D.huitema-quic-mpath-req}}. Using PCIDs as
-implicit path identifier makes this linkability harder than having explicit
-signaling as in the early version of this draft and does not require public
-header change to keep invariants {{I-D.ietf-quic-invariants}}. The MCIDs of a
-connection will be the PCIDs of the Initial Path. In the example of
-{{examplempquic}}, if the connection started using WLAN, then the
-Destination Connection ID A is both the PDCID of the WLAN sending path and the MDCID of the
-connection.
+Once established, a Multipath QUIC connection consists in one or more uniflow(s)
+from the client to the server and one or more uniflow(s) from the server to the
+client. The number of uniflows in one direction can be different from the one in
+the other direction. The example in {{uniflowsexample}} shows two
+uniflows from the client to the server and three uniflows from the server to the
+client. From the end-hosts' viewpoint, they observe two kinds of uniflows:
 
-In addition to the PCIDs, some additional information is kept for each asymmetric path.
-The Path ID identifies the assymetric path at the frame level and ensures uniqueness of
-the nonce (see {{nonce-considerations}} for details). A congestion window is
-maintained for each sending path. Hosts can also collect network measurements on a
-per-path basis, such as one-way delay measurements and lost packets.
+* Sending uniflows: uniflows on which the host can send packets over it
+
+* Receiving uniflows: uniflows on which the host can receive packets over it
+
+Reconsidering the example in {{uniflowsexample}}, the client has two
+sending uniflows and three receiving uniflows. The server has three sending
+uniflows and two receiving uniflows. There is thus a one-to-one mapping between
+the sending uniflows of an host and the receiving uniflows of its peer. A
+uniflow is seen as a sending uniflow from the sender's perspective and as a
+receiving uniflow from the receiver's viewpoint.
+
+Uniflows may share a common network path, but this is not mandatory.
+
+Each uniflow is associated with a specific four-tuple and identified by a
+Uniflow ID, as shown in {{architectural}}.
+
+~~~~~~~~~~
+    +-----------------------------------------------------+
+    |                      Connection                     |
+    |   +-----------+ +-----------+ ... +-------------+   |
+    |   |  Sending  | |  Sending  | ... |   Sending   |   |
+    |   | Uniflow 0 | | Uniflow 1 |     | Uniflow N-1 |   |
+    |   |   Tuple   | |   Tuple'  | ... |    Tuple"   |   |
+    |   | UDCID set | | UDCID set'| ... |  UDCID set" |   |
+    |   |    PNS    | |    PNS'   |     |     PNS"    |   |
+    |   +-----------+ +-----------+ ... +-------------+   |
+    |   +-----------+ +-----------+ ... +-------------+   |
+    |   | Receiving | | Receiving | ... |  Receiving  |   |
+    |   | Uniflow 0 | | Uniflow 1 |     | Uniflow M-1 |   |
+    |   |   Tuple   | |   Tuple'  | ... |    Tuple"   |   |
+    |   | USCID set | | USCID set'|     |  USCID set" |   |
+    |   |    PNS    | |    PNS'   |     |     PNS"    |   |
+    |   +-----------+ +-----------+ ... +-------------+   |
+    +-----------------------------------------------------+
+~~~~~~~~~~
+{: #architectural title="Architectural view of Multipath QUIC for an host having N sending uniflows and M receiving uniflows"}
+
+As described before, a Multipath QUIC connection starts using the Initial
+Uniflows, identified by Uniflow ID 0. It can then spread packets over several
+uniflows. Each uniflow has its (set of) Uniflow Connection ID(s) (UCID) packets
+use to explicitly mark they belong to. Depending on the direction of the
+uniflow, the host keeps either the Uniflow Source Connection ID (USCID, for the
+receiving uniflows) or the Uniflow Destination Connection ID (USCID, for the
+sending uniflows). Notice that the (set of) UDCID(s) of a sending uniflow of an
+host is the same as the (set of) USCID(s) of the corresponding receive uniflow
+of the remote. Preventing the linkability of different uniflows is an important
+requirement for the multipath extensions {{I-D.huitema-quic-mpath-req}}. Using
+UCIDs as implicit uniflow identifiers makes this linkability harder than having
+explicit signaling as in the early version of this draft and does not require
+public header change to keep invariants {{I-D.ietf-quic-invariants}}.
+
+In addition to the UCIDs, some additional information is kept for each uniflow.
+The Uniflow ID identifies the uniflow at the frame level and ensures uniqueness
+of the nonce (see {{nonce-considerations}} for details) while limiting the
+number of concurrently used uniflows. A congestion window is maintained for each
+sending uniflow. Hosts can also collect network measurements on a per-uniflow
+basis, such as one-way delay measurements and lost packets.
 
 
 Path Establishment
