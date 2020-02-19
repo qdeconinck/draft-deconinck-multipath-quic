@@ -1206,7 +1206,7 @@ The format of the MP_ACK frame is shown below.
 
 Compared to the ACK frame, the MP_ACK frame is prefixed by a variable size
 Uniflow ID field indicating to which uniflow the acknowledged packet sequence
-numbers relate to. 
+numbers relate to.
 
 Since frames are independent of packets, and the uniflow notion relates to the
 packets, the (MP_)ACK frames can be sent on any uniflow, unlike Multipath TCP
@@ -1225,7 +1225,11 @@ The format of the ADD_ADDRESS frame is shown below.
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|0|0|0|P|IPVers.|Address ID (8) |Interface T.(8)|
+|0|0|0|P|IPVers.|Address ID (8) |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       Sequence Number (i)                   ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|Interface T.(8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                       IP Address (32/128)                   ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -1234,32 +1238,52 @@ The format of the ADD_ADDRESS frame is shown below.
 ~~~~~~~~~~
 {: #add_address_frame title="ADD_ADDRESS Frame"}
 
-The ADD_ADDRESS frame contains the following fields:
+The ADD_ADDRESS frame contains the following fields.
 
-* Reserved bits: the three most-significant bits of the first byte are set to
-  0, and are reserved for future use.
+Reserved bits:
 
-* P bit: the fourth most-significant bit of the first byte indicates, if set,
-  the presence of the Port field.
+ : The three most-significant bits of the first byte are set to 0, and are
+   reserved for future use.
 
-* IPVers.: the remaining four least-significant bits of the first byte
-  contain the version of the IP address contained in the IP Address field.
+P bit:
 
-* Address ID: an unique identifier for the advertised address for tracking and
-  removal purposes. This is needed when, e.g., a NAT changes the IP address
-  such that both hosts see different IP addresses for a same path endpoint.
+ : The fourth most-significant bit of the first byte indicates, if set, the
+   presence of the Port field.
 
-* Interface Type: used to provide an indication about the interface type to
-  which this address is bound. The following values are defined:
-   o 0: fixed. Used as default value.
-   o 1: WLAN
-   o 2: cellular
+IPVers.:
 
-* IP Address: the advertised IP address, in network order.
+ : The remaining four least-significant bits of the first byte contain the
+   version of the IP address contained in the IP Address field.
 
-* Port: this optional field indicates the port number related to the
-  advertised IP address. When this field is present, it indicates that a path
-  can use the 2-tuple (IP addr, port).
+Address ID:
+
+ : An unique identifier for the advertised address for tracking and removal
+   purposes. This is needed when, e.g., a NAT changes the IP address such that
+   both hosts see different IP addresses for a same network path.
+
+Sequence Number:
+
+ : An Address ID related sequence number of the event. The sequence number space
+   is shared with REMOVE_ADDRESS frames mentioning the same Address ID.
+
+Interface Type:
+
+ : Used to provide an indication about the interface type to which this address
+   is bound. The following values are defined:
+
+   * 0: fixed. Used as default value.
+   * 1: WLAN
+   * 2: cellular
+
+IP Address:
+
+ : The advertised IP address, in network order.
+
+Port:
+
+ : This optional field indicates the port number related to the advertised IP
+   address. When this field is present, it indicates that a uniflow can use the
+   2-tuple (IP addr, port).
 
 
 Upon reception of an ADD_ADDRESS frame, the receiver SHOULD store the
@@ -1272,24 +1296,40 @@ possibly private addresses SHOULD NOT be exchanged.
 REMOVE_ADDRESS Frame
 --------------------
 
-The REMOVE_ADDRESS frame is used by a host to signal that a previously
-announced address was lost. The proposed type for the REMOVE_ADDRESS frame is
-0x23. A REMOVE_ADDRESS frame is shown below.
+The REMOVE_ADDRESS frame (type=0x25) is used by a host to signal that a
+previously announced address was lost.
+
+The format of the REMOVE_ADDRESS frame is shown below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+
 |Address ID (8) |
-+-+-+-+-+-+-+-+-+
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       Sequence Number (i)                   ...
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
 {: #remove_address_frame title="REMOVE_ADDRESS Frame"}
 
-The frame contains only one field, Address ID, being the identifier of the
-address to remove. A host SHOULD stop using paths using the removed address
-and set them in the UNUSABLE state. If the REMOVE_ADDRESS contains an Address
-ID that was not previously announced, the receiver MUST silently ignore the
-frame.
+The REMOVE_ADDRESS frame contains the following fields.
+
+Address ID:
+
+ : The identifier of the address to remove.
+
+Sequence Number:
+
+ : An Address ID related sequence number of the event. The sequence number space
+   is shared with ADD_ADDRESS frames mentioning the same Address ID. This help
+   the receiver figure out that a REMOVE_ADDRESS might have been sent before an
+   ADD_ADDRESS frame implying the same Address ID, even if for some reason the
+   REMOVE_ADDRESS reaches the receiver after the newer ADD_ADDRESS one.
+
+
+A host SHOULD stop using sending uniflows using the removed address and set them
+in the UNUSED state. If the REMOVE_ADDRESS contains an Address ID that was not
+previously announced, the receiver MUST silently ignore the frame.
 
 
 PATHS Frame
