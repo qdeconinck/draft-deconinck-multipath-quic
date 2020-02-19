@@ -330,8 +330,8 @@ The example of {{examplempquic}} shows a possible data exchange between a
 dual-homed client performing a request fitting in two packets and a single-homed
 server. Notice that the Uniflow ID used by an host over a specific network path
 is not necessarily the same as the one used by the remote peer. In the presented
-example, the phone sends packets over WLAN on uniflow 1 and over LTE on uniflow
-2, while the packets sent by the server over WLAN are on uniflow 2 and over LTE
+example, the phone sends packets over WLAN on uniflow 0 and over LTE on uniflow
+1, while the packets sent by the server over WLAN are on uniflow 2 and over LTE
 are on uniflow 1.
 
 
@@ -339,21 +339,21 @@ are on uniflow 1.
 Server                        Phone                        Server
 via WLAN                                                  via LTE
 -------                      -------                        -----
-  | Pkt(DCID=B,PN=1,frames=[    |                             |
-  |  STREAM("Request (1/2)")])  | Pkt(DCID=D,PN=1,frames=[    |
+  | Pkt(DCID=A,PN=5,frames=[    |                             |
+  |  STREAM("Request (1/2)")])  | Pkt(DCID=B,PN=1,frames=[    |
   |<----------------------------|  STREAM("Request (2/2)")])  |
-  | Pkt(DCID=A,PN=1,frames=[    |--------                     |
-  |  ACK(UID=1,LargestAcked=1)])|       |----------           |
+  | Pkt(DCID=E,PN=1,frames=[    |--------                     |
+  |  ACK(LargestAcked=5)])      |       |----------           |
   |---------------------------->|                 |--------   |
-  | Pkt(DCID=A,PN=2,frames=[    |                         |-->|
-  |  STREAM("Response 1")])     | Pkt(DCID=C,PN=1,frames=[    |
-  |---------------------------->|  ACK(UID=2,LargestAcked=1), |
+  | Pkt(DCID=E,PN=2,frames=[    |                         |-->|
+  |  STREAM("Response 1")])     | Pkt(DCID=D,PN=1,frames=[    |
+  |---------------------------->|  MPACK(UID=1,LargestAck=1), |
   |                             |  STREAM("Response 2")])  ---|
-  | Pkt(DCID=B,PN=2,frames=[    |                 ---------|  |
-  |  ACK(UID=2,LargestAcked=2), |       ----------|           |
-  |  ACK(UID=1,LargestAcked=1)])|<------|                     |
+  | Pkt(DCID=A,PN=6,frames=[    |                 ---------|  |
+  |  MPACK(UID=2,LargestAck=2), |       ----------|           |
+  |  MPACK(UID=1,LargestAck=1)])|<------|                     |
   |<----------------------------|                             |
-  | Pkt(DCID=A,PN=3,frames=[    | Pkt(DCID=D,PN=2,frames=[    |
+  | Pkt(DCID=A,PN=7,frames=[    | Pkt(DCID=D,PN=2,frames=[    |
   |  STREAM("Response 3")])     |  STREAM("Response 4")])     |
   |---------------------------->|                         ----|
   |                             |                   ------|   |
@@ -480,84 +480,133 @@ basis, such as one-way delay measurements and lost packets.
 Path Establishment
 ------------------
 
-The max_sending_paths transport parameter exchanged during the cryptographic handshake
-determines if multiple paths can be used. Then, hosts provide to their peer the Path
-Connection ID to use on asymmetric paths. Unlike Multipath TCP {{RFC6824}},
-both hosts dynamically control how many sending paths can currently be in use by the peer, i.e.,
-the number of different Path IDs proposed to the peer. Notice that the peers might advertise
-a different number of sending Path IDs to their peer, setting different limits to the sending
-and receive paths of each host. The max_sending_paths transport parameter indicates the
-maximum number of sending paths the host would support to receive from the peer.
+The `max_sending_uniflow_id` transport parameter exchanged during the
+cryptographic handshake fixes a upper bound on the number of sending uniflows an
+host want to support. Then, hosts provide to their peer Uniflow Connection IDs
+to use on uniflows. Unlike Multipath TCP {{RFC6824}}, both hosts dynamically
+control how many sending uniflows can currently be in use by the peer, i.e., the
+number of different Uniflow IDs proposed to the peer. While the advertisement of
+the upper bound of sending paths is a sender-oriented process, the actual
+initation of a uniflow is a receiver-oriented process, as the sender needs a
+UCID communicated by the receiver before using a uniflow. Notice that the peers
+might advertise different values for the `max_sending_uniflow_id` transport
+parameters to their peer, setting different upper bounds to the sending and
+receiving uniflows of each host.
 
-Hosts propose new receive paths with an extended version of the NEW_CONNECTION_ID
-frame (see {{newconnectionidsec}}). This frame provides to the peer the PDCID for a given
-sending path. Upon reception of the frame, the peer can start using the proposed sending path Path ID with the provided PDCID. Therefore, once an host sent such NEW_CONNECTION_ID frame, it MUST be ready to receive packets from that Path ID with the proposed PCID. As frames are encrypted, adding
-new paths does not leak cleartext identifiers
-{{I-D.huitema-quic-mpath-req}}.
+Hosts initiate the creation of their receiving uniflows by sending
+MP_NEW_CONNECTION_ID frames (see {{newconnectionidsec}}) which can be seen as an
+extended version of the NEW_CONNECTION_ID frame. This frame provides to the peer
+a UDCID for a given sending uniflow. Upon reception of the MP_NEW_CONNECTION_ID
+frame, an host can start using the proposed sending uniflow having the
+referenced Uniflow ID by marking sent packets with the provided UDCID.
+Therefore, once an host sent such MP_NEW_CONNECTION_ID frame, it MUST be ready
+to receive packets from that Uniflow ID with the proposed UCID. As frames are
+encrypted, adding new uniflows over a QUIC connection does not leak cleartext
+identifiers {{I-D.huitema-quic-mpath-req}}.
 
-A server might provide several Path Connection IDs for the same asymmetric Path IDs
-with multiple NEW_CONNECTION_ID frames. This can be useful to cope with
-migration cases, as described in {{path-migration}}. Multipath QUIC is asymmetrical.
-Any host can start using new sending paths once their corresponding PDCIDs have been provided by the remote peer.
+A server might provide several Uniflow Connection IDs for the same Uniflow IDs
+with multiple MP_NEW_CONNECTION_ID frames. This can be useful to cope with
+migration cases, as described in {{path-migration}}. Multipath QUIC is
+asymmetrical. Any host can start using new sending uniflows once their
+corresponding UDCIDs have been provided by the remote peer.
 
-Hosts are not able to create new paths as long as the peer does not send
-NEW_CONNECTION_ID frames. To limit the latency of the path
-handshake, hosts should send those frames as soon as possible, i.e., just
-after the 0-RTT handshake packet.
+Hosts are not able to use new uniflows as long as their peer does not send
+MP_NEW_CONNECTION_ID frames. To limit the delay between the connection
+establishment and the usage of additional uniflows, hosts should send those
+frames as soon as possible, i.e., just after the 0-RTT handshake packet.
 
-Sending useful data on a fresh new sending path might lead to poor performance
-as the network path used by the QUIC path is not usable yet. A typical case is
-when a server wants to initiate a new path to a client behind a NAT. The
-client would possibly never receive this packet, leading to connectivity
-issues on that path. To avoid such issues, a remote address MUST have been
-validated as described in {{I-D.ietf-quic-transport}} before sending packets
-on a sending  path using it. A host MUST be prepared to receive packets on paths it
-advertised.
+Sending useful data on a fresh new sending uniflow might lead to poor
+performance as the network path used by the QUIC uniflow might not be usable. A
+typical case is when a server wants to initiate a new sending uniflow to a
+client behind a NAT. The client would possibly never receive this packet,
+leading to connectivity issues on that uniflow. In addition, an opportunistic
+usage of network paths might also lead to possible attacks, such as a client
+advertising the IP address of a victim hoping that the server will flood it. To
+avoid these issues, a remote address MUST have been validated as described in
+{{I-D.ietf-quic-transport}} before associating it on a sending uniflows.
 
-Because attaching to new networks may be volatile and an endpoint does not
-have full visibility on multiple paths that may be available (e.g., hosts
-connected to a CPE), an MP-QUIC capable endhost SHOULD advertise a max_sending_paths
-value of at least 4 and SHOULD propose at least 4 receive paths to its peer.
+Because attaching to new networks may be volatile and an endpoint does not have
+full visibility on multiple paths that may be available (e.g., hosts connected
+to a CPE), an Multipath QUIC capable endhost SHOULD advertise a
+`max_sending_uniflow_id` value of at least 4 and SHOULD propose at least 4
+receiving uniflows to its peer.
+
 
 Exchanging Data over Multiple Paths
 -----------------------------------
 
 A QUIC packet acts as a container for one of more frames. Multipath QUIC uses
-the same STREAM frames as QUIC to carry data. A byte offset is associated to
-the data payload. One of the key design decision of (Multipath) QUIC is that
-frames are independent of the packets carrying them. This implies that a frame
-transmitted over one path could be retransmitted later on another path without
-any change.
+the same STREAM frames as QUIC to carry data. A byte offset is associated to the
+data payload. One of the key design decision of (Multipath) QUIC is that frames
+are independent of the packets carrying them. This implies that a frame
+transmitted over one uniflow could be retransmitted later on another uniflow
+without any change.
 
-The path on which data is sent is a packet-level information. This means a
-frame can be sent regardless of the path of the packet carrying it.
+The uniflow on which data is sent is a packet-level information. This means a
+frame can be sent regardless of the uniflow of the packet carrying it.
 Furthermore, because the data offset is a frame-level information, there is no
 need to define additional sequence numbers to cope with reordering across
-paths, unlike Multipath TCP {{RFC6824}} that uses a Data Sequence Number at the
-MPTCP level. Other flow control considerations like the stream receive window
-advertised by the MAX_STREAM_DATA frame remain unchanged when there are
-multiple paths.
+uniflows, unlike Multipath TCP {{RFC6824}} that uses a Data Sequence Number at
+the Multipath TCP level. Other flow control considerations like the stream
+receive window advertised by the MAX_STREAM_DATA frame remain unchanged when
+there are multiple sending uniflows.
 
 However, Multipath QUIC might face reordering at packet-level when using paths
-having different latencies. The presence of different Path Connection IDs
-ensures that the packets sent over a given path will contain monotonically
-increasing packet numbers. To ensure more flexibility and potentially to
-reduce the ACK block section of the ACK frame when aggregating bandwidth of
-paths exhibiting different network characteristics, each path keeps its own
-monotonically increasing Packet Number space. This potentially allows sending
-up to 2 * 2^62 * 2^62 packets on a QUIC connection since each path has its own
-packet number space.
+having different latencies. The presence of different Uniflow Connection IDs
+ensures that the packets sent over a given uniflow will contain monotonically
+increasing packet numbers. To ensure more flexibility and potentially to reduce
+the ACK block section of the (MP_)ACK frame when aggregating bandwidth of
+uniflows exhibiting different network characteristics, each uniflow keeps its
+own monotonically increasing Packet Number space. This potentially allows
+sending up to 2 * 2^62 * 2^62 packets on a QUIC connection since each uniflow
+has its own packet number space.
 
-The ACK frame is also modified to allow per-path packet acknowledgments. This
-remains compliant with the independence between packets and frames while
-providing more flexibility to hosts to decide on which sending path they want to send
-receive path acknowledgments. Looking again at {{examplempquic}}, packets that were
-sent over a given sending path (e.g., the "Response 2" packet on server sending path 1 with DCID C) can
-be acknowledged on another sending path (here, client sending path 1 with DCID B) that
-does not correspond to the same underlying network to limit the latency
-due to ACK transmissions on high-latency paths and to enable the usage of unidirectional networks.
-Such scheduling decision would not have been possible in Multipath TCP {{RFC6824}} which must acknowledge
-data on the (symmetric) path it was received on.
+With the introduction of multiple uniflows, there is a need to acknowledge them
+separately. The Initial Uniflows (with Uniflow ID 0) are still acknowledged with
+regular ACK frames, such that no modification is introduced in a core frame. For
+the other uniflows, the multipath extensions introduce a MP_ACK frame which
+contains the same fields as the ACK frame, plus a Uniflow ID field indicating
+which receving uniflow the host acknowledges. To better explain this, let us
+consider the situation illustrated in {{ack-uniflows}}.
+
+~~~~~~~~~~
+Sending uniflow 0 - CID A      |    Receiving uniflow 0 - CID A
+Sending uniflow 1 - CID B      |    Receiving uniflow 1 - CID B
+Receiving uniflow 0 - CID C    |      Sending uniflow 0 - CID C
+Receiving uniflow 1 - CID D    |      Sending uniflow 1 - CID D
+Receiving uniflow 2 - CID E    |      Sending uniflow 2 - CID E
+
+Client                                                   Server
+------                                                   ------
+   |                                                        |
+   |       Pkt(DCID=B,PN=42,frames=[STREAM("Request")])     |
+   |---------------------------                             |
+   |                          |---------------------------->|
+   |                                                        |
+   |  Pkt(DCID=E,PN=58,frames=[                             |
+   |   STREAM("Response"), MP_ACK(UID=1,LargestAcked=42)])  |
+   |                          ------------------------------|
+   |<-------------------------|                             |
+   |                                                        |
+~~~~~~~~~~
+{: #ack-uniflows title="Acknowledging packets sent on uniflows"}
+
+Here five uniflows are in use, two in the client to server direction and three
+in the reverse one. In this case, the client first sends a packet on its sending
+uniflow 1 (linked to the CID B). The server hence receives the packet on its
+receiving uniflow 1. Therefore, it generates a MP_ACK frame for the Uniflow ID 1
+and transmits it to the client. The server has the freedom to choose any of its
+sending unflows to transmit this frame. In the provided situation, the server
+sends its packets on its sending uniflow 2 (and the client will thus receives
+this packet on its receiving uniflow 2). Similarly, by looking at
+{{examplempquic}} again, packets that were sent over a given uniflow (e.g., the
+"Response 2" packet on server's sending uniflow 1 with DCID D) can be
+acknowledged on another uniflow (here, client's sending uniflow 0 with DCID A)
+that does not correspond to the same underlying network to limit the latency due
+to (MP_)ACK transmissions on high-latency network paths and to enable the usage
+of unidirectional networks. Such scheduling decision would not have been
+possible in Multipath TCP {{RFC6824}} which must acknowledge data on the
+(bidirectional) path it was received on.
 
 
 Exchanging Addresses
