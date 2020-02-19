@@ -1332,13 +1332,14 @@ in the UNUSED state. If the REMOVE_ADDRESS contains an Address ID that was not
 previously announced, the receiver MUST silently ignore the frame.
 
 
-PATHS Frame
------------
+UNIFLOWS Frame
+--------------
 
-The PATHS frame communicates the paths state of the sending host to the peer.
-It allows the sender to communicate its active paths to the peer in order to
-detect potential connectivity issue over paths. Its proposed type is 0x24. The
-format of the PATHS frame is shown below.
+The UNIFLOWS frame (type=0x26) communicates the uniflows' state of the sending
+host to the peer. It allows the sender to communicate its active uniflows to the
+peer in order to detect potential connectivity issue over uniflows.
+
+The format of the UNIFLOWS frame is shown below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
@@ -1346,90 +1347,101 @@ format of the PATHS frame is shown below.
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                          Sequence (i)                       ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                    ActiveReceivePaths (i)                   ...
+|                      ReceivingUniflows (i)                  ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                    ActiveSendingPaths (i)                   ...
+|                   ActiveSendingUniflows (i)                 ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                 Receive Path Info Section (*)               ...
+|               Receiving Uniflow Info Section (*)            ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                 Sending Path Info Section (*)               ...
+|                Sending Uniflow Info Section (*)             ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
-{: #paths_frame title="PATHS Frame"}
+{: #uniflows_frame title="UNIFLOWS Frame"}
 
-The PATHS frame contains the following fields:
+The UNIFLOWS frame contains the following fields.
 
-* Sequence: A variable-length integer. This value starts at 0 and increases by
-  1 for each PATHS frame sent by the host. It allows identifying the most
-  recent PATHS frame.
+Sequence:
 
-* ActiveReceivePaths: the current number of additional receive paths considered as being
-  active from the sender point of view, i.e., (the number of active receive paths -
-  1).
+ : A variable-length integer. This value starts at 0 and increases by 1 for each
+   UNIFLOWS frame sent by the host. It allows identifying the most recent
+   UNIFLOWS frame.
 
-* ActiveSendingPaths: the current number of additional sending paths considered as being
-  active from the sender point of view, i.e., (the number of active sending paths -
-  1).
+ReceivingUniflows:
 
-* Receive Path Info Section: contains information about all the active receive paths (i.e.,
-  there are ActivePaths + 1 entries).
+ : The current number of receiving uniflows considered as being usable from the
+   sender's point of view.
 
-* Sending Path Info Section: contains information about all the active sending paths (i.e.,
-  there are ActivePaths + 1 entries).
+ActiveSendingUniflows:
+
+ : The current number of sending uniflows in the ACTIVE state from the sender's
+   point of view.
+
+Receiving Uniflow Info Section:
+
+ : Contains information about the receiving uniflows (there are
+   ReceivingUniflows entries).
+
+Sending Uniflow Info Section:
+
+ : Contains information about the sending uniflows in ACTIVE state (there are
+   ActiveSendingUniflows entries).
 
 
-Both Receive Path Info and Sending Path Info Sections share the same
+Both Receiving Uniflow Info and Sending Uniflow Info Sections share the same
 format, which is shown below.
 
 ~~~~~~~~~~
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Path ID 0 (i)                       ...
+|                       Uniflow ID 0 (i)                      ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|LocAddrID 0 (8)|RemAddrID 0 (8)|
+|LocAddrID 0 (8)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
                                ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Path ID N (i)                       ...
+|                       Uniflow ID N (i)                      ...
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|LocAddrID N (8)|RemAddrID N (8)|
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|LocAddrID N (8)|
++-+-+-+-+-+-+-+-+
 ~~~~~~~~~~
-{: #path_info_section title="Path Info Section"}
+{: #uniflow_info_section title="Uniflow Info Section"}
 
-The fields in the Path Info Section are:
+The fields in the Uniflow Info Section are the following.
 
-* Path ID: the Path ID of the active path the sending host provides
-  information about.
+Uniflow ID:
 
-* LocAddrID: the local Address ID of the address currently used by the path.
+ : The Uniflow ID of the uniflow the sending host provides information about.
 
-* RemAddrID: the remote Address ID of the address currently used by the path.
+LocAddrID:
 
-The Path Info section only contains the Local and Remote Address IDs so far, but this
+ : The local Address ID of the address currently used by the uniflow.
+
+
+The Uniflow Info section only contains the local Address ID so far, but this
 section can be extended later with other potentially useful information.
 
 
-Extension of the Meaning of Existant QUIC Frames
+Extension of the Meaning of Existing QUIC Frames
 ================================================
 
 The multipath extensions do not modify the wire format of existing QUIC frames.
 However, they extend the meaning of a few of them while keeping this addition
-transparent and consistent with the single-path QUIC design.
+transparent and consistent with the single-path QUIC design. The concerned
+frames (and their extended meaning) are the following.
 
+NEW_CONNECTION_ID:
 
+ : Equivalent to a MP_NEW_CONNECTION_ID frame with Uniflow ID set to 0.
 
-Modifications to QUIC frames
-============================
+RETIRE_CONNECTION_ID:
 
-The multipath extension allows hosts to send packets over multiple paths.
-Since nearly all QUIC frames are independent of packets, no change is
-required for most of them. The only exceptions are the NEW_CONNECTION_ID and
-the ACK frames. The NEW_CONNECTION_ID and RETIRE_CONNECTION_ID are modified to provide
-Destination Path Connection ID negotiation for each asymmetric path. The ACK frame
-contains packet-level information with the Largest Acknowledged field. Since the Packet Numbers are now
-associated to asymmetric paths, the ACK frame must contain the Path ID it acknowledges.
+ : Equivalent to a MP_RETIRE_CONNECTION_ID frame with Uniflow ID set to 0.
+
+ACK:
+
+ : Equivalent to a MP_ACK frame with Uniflow ID set to 0.
+
 
 
 Security Considerations
@@ -1438,41 +1450,41 @@ Security Considerations
 Nonce Computation {#nonce-considerations}
 -----------------
 
-With Multipath QUIC, each path has its own packet number space. With the
+With Multipath QUIC, each uniflow has its own packet number space. With the
 current nonce computation {{I-D.ietf-quic-tls}}, using twice the same packet
-number over two different paths leads to the same cryptographic nonce.
-Depending on the size of the Initial Value (and hence the nonce), there are
-two ways to mitigate this issue.
+number over two different uniflows on the same direction leads to the same
+cryptographic nonce. Depending on the size of the Initial Value (and hence the
+nonce), there are two ways to mitigate this issue.
 
 If the Initial Value has a length of 8 bytes, then a packet number used on a
-given path MUST NOT be reused on another path of the connection, and therefore
-at most 2^64 packets can be sent on a QUIC connection. This means there will
-be packet number skipping at path level, but the packet number will remain
-monotonically increasing on each path.
+given path MUST NOT be reused on another uniflow of the connection, and
+therefore at most 2^64 packets can be sent on a QUIC connection. This means
+there will be packet number skipping at uniflow level, but the packet number
+will remain monotonically increasing on each uniflow.
 
 If the Initial Value has a length of 9 or more, then the cryptographic nonce
 computation is now performed as follows. The nonce, N, is formed by combining
 the packet protection IV (either client_pp_iv_n or server_pp_iv_n) with the
-Path ID and the packet number. The 64 bits of the reconstructed QUIC packet
+Uniflow ID and the packet number. The 64 bits of the reconstructed QUIC packet
 number in network byte order is left-padded with zeros to the size of the IV.
-The Path ID encoded in its variable-length format is right-padded with zeros
-to the size of the IV. The Path IV is computed as the exclusive OR of the
-padded Path ID and the IV. The exclusive OR of the padded packet number and
-the Path IV forms the AEAD nonce.
+The Uniflow ID encoded in its variable-length format is right-padded with zeros
+to the size of the IV. The Uniflow IV is computed as the exclusive OR of the
+padded Uniflow ID and the IV. The exclusive OR of the padded packet number and
+the Uniflow IV forms the AEAD nonce.
 
 
 Validation of Exchanged Addresses {#validation_address}
 ---------------------------------
 
 To use addresses communicated by the peer through ADD_ADDRESS frames, hosts are
-required to validate them before using paths to these addresses. The main
-reason for this validation is that the remote host might have sent, purposely
-or not, a packet with a source IP that does not correspond to the IP of the
-remote interface. This could lead to amplification attacks where the client
-start using a new path with a source IP corresponding to the victim's one.
-Without validation, the server might then flood the victim. Similarly for
-ADD_ADDRESS frames, a malicious server might advertise the IP address of a
-victim, hoping that the client will use it without validating it before.
+required to validate them before using uniflows to these addresses. The main
+reason for this validation is that the remote host might have sent, purposely or
+not, a packet with a source IP that does not correspond to the IP of the remote
+interface. This could lead to amplification attacks where the client start using
+a new path with a source IP corresponding to the victim's one. Without
+validation, the server might then flood the victim. Similarly for ADD_ADDRESS
+frames, a malicious server might advertise the IP address of a victim, hoping
+that the client will use it without validating it before.
 
 
 IANA Considerations
@@ -1485,9 +1497,9 @@ This document defines a new transport parameter for the negotiation of
 multiple paths. The following entry in {{iana-tp-table}} should be added to
 the "QUIC Transport Parameters" registry under the "QUIC Protocol" heading.
 
-| Value  | Parameter Name | Specification     |
-|:-------|:---------------|:------------------|
-| 0x0020 | max_paths      | {{tp-definition}} |
+| Value  | Parameter Name         | Specification     |
+|:-------|:-----------------------|:------------------|
+| 0x0020 | max_sending_uniflow_id | {{tp-definition}} |
 {: #iana-tp-table title="Addition to QUIC Transport Parameters Entries"}
 
 
@@ -1514,7 +1526,8 @@ Since draft-deconinck-quic-multipath-03
 
 - Clarify the notion of asymmetric paths by introducing uniflows
 - Remove the PATH_UPDATE frame
-- Rename PATHS frame to UNIFLOWS frame
+- Rename PATHS frame to UNIFLOWS frame and adapts its content
+- Add a sequence number to frames involving Address ID events (#4)
 
 Since draft-deconinck-quic-multipath-02
 ---------------------------------------
