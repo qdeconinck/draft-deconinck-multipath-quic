@@ -42,21 +42,6 @@ informative:
   RFC7050:
   RFC7225:
   RFC8041:
-  Cellnet:
-     title: "Exploring Mobile/Wi-Fi Handover with Multipath TCP"
-     date: "2012"
-     seriesinfo: "ACM SIGCOMM workshop on Cellular Networks (Cellnet'12)"
-     author:
-     -
-       ins: C. Paasch
-     -
-       ins: G. Detal
-     -
-       ins: F. Duchene
-     -
-       ins: C. Raiciu
-     -
-       ins: O. Bonaventure
   MPRTP:
      title: "MPRTP: Multipath considerations for real-time media"
      date: "2013"
