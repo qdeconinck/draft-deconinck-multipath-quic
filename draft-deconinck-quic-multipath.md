@@ -390,6 +390,11 @@ packets, but it still supports the multipath extensions. Such situation might be
 useful when the host does not require multiple networks paths for packet sending
 but still wants to let the peer use multiple uniflows to reach it.
 
+The usage of multiple uniflows relies on the ability to use several Connection
+IDs over a same QUIC connection. Therefore, zero-length Connection IDs MUST NOT
+be used if the multipath extensions are enabled and the peer advertises a value
+different from 0 for the `max_sending_uniflow_id` transport parameter.
+
 
 Architecture of Multipath QUIC
 ------------------------------
@@ -1528,6 +1533,7 @@ Since draft-deconinck-quic-multipath-03
 - Remove the PATH_UPDATE frame
 - Rename PATHS frame to UNIFLOWS frame and adapts its content
 - Add a sequence number to frames involving Address ID events (#4)
+- Disallow Zero-length connection ID (#2)
 
 Since draft-deconinck-quic-multipath-02
 ---------------------------------------
