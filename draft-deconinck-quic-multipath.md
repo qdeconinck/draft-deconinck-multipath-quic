@@ -612,53 +612,60 @@ possible in Multipath TCP {{RFC6824}} which must acknowledge data on the
 Exchanging Addresses
 --------------------
 
-When a multi-homed mobile device connects to a dual-stacked server using its IPv4
-address, it is aware of its local addresses (e.g., the Wi-Fi and the cellular
-ones) and the IPv4 remote address used to establish the QUIC connection. If
-the client wants to create new paths over IPv6, it needs to learn the other
-addresses of the remote peer.
+When a multi-homed mobile device connects to a dual-stacked server using its
+IPv4 address, it is aware of its local addresses (e.g., the Wi-Fi and the
+cellular ones) and the IPv4 remote address used to establish the QUIC
+connection. If the client wants to create new uniflows and use them over the
+IPv6 network, it needs to learn the other addresses of the remote peer.
 
 This is possible with the ADD_ADDRESS frames that are sent by a Multipath QUIC
 host to advertise its current addresses. Each advertised address is identified
-by an Address ID. The addresses attached to a host can vary during the
-lifetime of a Multipath QUIC connection. A new ADD_ADDRESS frame is
-transmitted when a host has a new address. This ADD_ADDRESS frame is protected
-as other QUIC control frames, which implies that it cannot be spoofed by
-attackers. The communicated address is first validated by the receiving host
-before it starts using it. This ensures that the address actually belongs to
-the peer and that the peer can send and receive packets on that address. It
-also prevents hosts from launching amplification attacks to a victim address.
+by an Address ID. The addresses attached to an host can vary during the lifetime
+of a Multipath QUIC connection. A new ADD_ADDRESS frame is transmitted when an
+host has a new address. This ADD_ADDRESS frame is protected as other QUIC
+control frames, which implies that it cannot be spoofed by attackers. The
+communicated address MUST first be validated by the receiving host before it
+starts using it. This process ensures that the advertised address actually
+belongs to the peer and that the peer can receive packets sent by the host on
+the provided address. It also prevents hosts from launching amplification
+attacks to a victim address.
 
 If the client is behind a NAT, it could announce a private address in an
-ADD_ADDRESS frame. In such situations, the server would not be able to
-validate the communicated address. The client might still use its NATed addresses
-to start a new sending path. To enable the server to make the link between the private
-and the public addresses, Multipath QUIC provides the PATHS frame that lists
-current active Path IDs. Notice that an host might also discover the public
-addresses of its peer by observing its remote IP addresses associated to the
-connection.
+ADD_ADDRESS frame. In such situations, the server would not be able to validate
+the communicated address. The client might still use its NATed addresses to
+start using its sending uniflows. To enable the server to make the link between
+the private and the public addresses and hence conciliate the different 4-tuple
+views, Multipath QUIC provides the PATHS frame that lists the current active
+sending Uniflow IDs along with their associated local Address ID. Notice that an
+host might also discover the public addresses of its peer by observing its
+remote IP addresses associated to the connection.
 
 Likewise, the client may be located behind a NAT64. As such it may announce an
 IPv6 address in an ADD_ADDRESS frame, that will be received over IPv4 by an
 IPv4-only server. The server should not discard that address, even if it is not
 IPv6-capable.
 
+TODO maybe move this paragraph in a companion draft
+
 An IPv6-only client may also receive from the server an ADD_ADDRESS frame which
-may contain an IPv4 address. The client should rely on means, such as {{RFC7050}}
-or {{RFC7225}}, to learn the IPv6 prefix to build an IPv4-converted IPv6 address.
+may contain an IPv4 address. The client should rely on means, such as
+{{RFC7050}} or {{RFC7225}}, to learn the IPv6 prefix to build an IPv4-converted
+IPv6 address.
 
-A receive path is active as soon as the host has sent the NEW_CONNECTION_ID frames
-proposing the corresponding Path Connection IDs to its peer. A sending path is
-active when its has received its Path Connection IDs and its is bound to a validated
-4-tuple. The PATHS frame indicates
-the local and remote Address IDs that the path uses. With this information, the server can
-then validate the public address and associate the advertised with the
-perceived addresses.
+A receiving uniflow is active as soon as the host has sent the
+MP_NEW_CONNECTION_ID frames proposing the corresponding Uniflow Connection IDs
+to its peer. A sending uniflow is active when it has received its Uniflow
+Connection IDs and is bound to a validated 4-tuple. The PATHS frame indicates
+the local Address IDs that the uniflow uses from the sender's perspective. With
+this information, the remote can then validate the public address and associate
+the advertised with the perceived addresses.
 
-Hosts that are connected behind an address sharing mechanism may collect
-the external IP address and port numbers assigned to the hosts and then
-use there addresses in the ADD_ADDRESS. Means to gather such information
-include, but not limited to, UPnP IGD, PCP, or STUN.
+TODO maybe move this paragraph in a companion draft
+
+Hosts that are connected behind an address sharing mechanism may collect the
+external IP address and port numbers assigned to the hosts and then use their
+addresses in the ADD_ADDRESS. Means to gather such information include, but not
+limited to, UPnP IGD, PCP, or STUN.
 
 
 Coping with Address Removals
@@ -667,73 +674,87 @@ Coping with Address Removals
 During the lifetime of a QUIC connection, a host might lose some of its
 addresses. A concrete example is a smartphone going out of reachability of a
 Wi-Fi network or shutting off one of its network interfaces. Such address
-removals are advertised by using REMOVE_ADDRESS frames. The REMOVE_ADDRESS
-frame contains the Address ID of the lost address previously communicated
-through ADD_ADDRESS.
+removals are advertised using REMOVE_ADDRESS frames. The REMOVE_ADDRESS frame
+contains the Address ID of the lost address previously communicated through
+ADD_ADDRESS. Notice that because a given Address ID might encounter several
+events that need to be ordered (e.g., ADD_ADDRESS, REMOVE_ADDRESS and
+ADD_ADDRESS again), both ADD_ADDRESS and REMOVE_ADDRESS frames include an
+Address ID related Sequence Number.
 
 
 Path Migration {#path-migration}
 --------------
 
-At a given time, a Multipath QUIC endpoint gathers a set of sending and receive
-paths, each associated to a 4-tuple. To address privacy issues due to the linkability of addresses
-with Connection IDs, hosts should avoid changing the 4-tuple used by a sending path.
-There remain situations where this change is unavoidable. These can be
-categorized into two groups: host-aware changes (e.g., network handover from
-Wi-Fi to cellular) and host-unaware changes (e.g., NAT rebinding).
+TODO: should this whole section be part of a companion draft?
 
-For the host-aware case, let us consider the case of a Multipath QUIC
-connection where the client is a smartphone with both Wi-Fi and cellular. It
-advertised both addresses and the server currently enables only one client-sending path, the
-initial one. The Initial Path uses the Wi-Fi address. Then, for some reason,
-the Wi-Fi address becomes unusable. To preserve connectivity, the client might
-then decide to use the cellular address for the Initial Path. It thus sends a
-REMOVE_ADDRESS announcing the loss of the Wi-Fi address and a PATHS frame to
-inform that the Initial Path is now using the cellular address. If the
-cellular address validation succeeds (which could have been done as soon as
-the cellular address was advertised), the server can continue exchanging data
-through the cellular address.
+At a given time, a Multipath QUIC endpoint gathers a set of active sending and
+receiving uniflows, each associated to a 4-tuple. To address privacy issues due
+to the linkability of addresses with Connection IDs, hosts should avoid changing
+the 4-tuple used by a sending uniflow. There still remain situations where this
+change is unavoidable. These can be categorized into two groups: host-aware
+changes (e.g., network handover from Wi-Fi to cellular) and host-unaware changes
+(e.g., NAT rebinding).
 
-However, both server and client might want to change their path used on the
+For the host-aware case, let us consider the case of a Multipath QUIC connection
+where the client is a smartphone with both Wi-Fi and cellular. It advertised
+both addresses and the server currently enables only one client's sending
+uniflow, the initial one. The Initial Uniflow uses the Wi-Fi address. Then, for
+some reason, the Wi-Fi address becomes unusable. To preserve connectivity, the
+client might then decide to use the cellular address for its Initial sending
+uniflow. It thus sends a REMOVE_ADDRESS announcing the loss of the Wi-Fi address
+and a PATHS frame to inform that its Initial sending uniflow is now using the
+cellular address. If the cellular address validation succeeds (which could have
+been done as soon as the cellular address was advertised), the server can
+continue exchanging data through the cellular address.
+
+TODO: I don't think we have to change the Uniflow ID, we can just rely on
+(MP_)NEW_CONNECTION_ID and (MP_)RETIRE_CONNECTION_ID -- hence, not sure the
+PATH_UPDATE frame is required, but will depend on the use cases
+
+However, both server and client might want to change the uniflow used on the
 cellular address for privacy concerns. If the server provides an additional
-path (e.g., Path ID 42) through NEW_CONNECTION_ID frame at the beginning of
-the connection, the client can perform the path change directly and avoid
-using the Initial Path Connection ID on the cellular network. This can be
-done using the PATH_UPDATE frame. It can indicate that the host stopped to use
-the Initial Path to use Path ID 42 instead. This frame is placed in the first
-packet sent to the new sending path with its corresponding PCID. The client can then
-send the REMOVE_ADDRESS and PATHS frames on this new path. Compared to the
-previous case, it is harder to link the paths with the IP addresses to observe
-that they belong to the same Multipath QUIC connection.
+uniflow (e.g., with Uniflow ID 1) through MP_NEW_CONNECTION_ID frame at the
+beginning of the connection, the client can perform the network path change
+directly and avoid using the Initial Uniflow Connection ID on the cellular
+network. This can be done using the PATH_UPDATE frame. It can indicate that the
+host stopped to use the Initial sending uniflow to use the one with Uniflow ID
+1 instead. This frame is placed in the first packet sent to the new sending
+uniflow with its corresponding UCID. The client can then send the REMOVE_ADDRESS
+and PATHS frames on this new uniflow. Compared to the previous case, it is
+harder to link the uniflows with the IP addresses to observe that they belong to
+the same Multipath QUIC connection.
 
 For the host-unaware case, the situation is similar. In case of NAT rebinding,
 the server will observe a change in the 2-tuple (source IP, source port) of the
-receive path of the packet. The server first validates that the 2-tuple actually belongs to the
-client {{I-D.ietf-quic-transport}}. If it is the case, the server can send a
-PATH_UPDATE frame on a previously communicated but unused Path ID. The client
-might have sent some packets with a given PCID on a different 4-tuple, but the
-server did not use the given PCID on that 4-tuple. Because some on-path devices
-may rewrite the source IP address to forward packets via the available network
-attachments (e.g., an host located behind a multi-homed CPE), the server may
-inadvertently conclude that a path is not anymore valid leading thus to
-frequently sending PATH_UPDATE frames as a function of the traffic distribution
-scheme enforced by the on-path device. To prevent such behavior, the server
-SHOULD wait for at least X seconds to ensure this is about a connection
-migration and not a side effect of an on-path multi-interfaced device.
+receiving uniflow of the packet. The server first validates that the 2-tuple
+actually belongs to the client {{I-D.ietf-quic-transport}}. If it is the case,
+the server can send a PATH_UPDATE frame on a previously communicated but unused
+Uniflow ID. The client might have sent some packets with a given UCID on a
+different 4-tuple, but the server did not use the given UCID on that 4-tuple.
+Because some on-path devices may rewrite the source IP address to forward
+packets via the available network attachments (e.g., an host located behind a
+multi-homed CPE), the server may inadvertently conclude that a uniflow is not
+anymore valid leading thus to frequently sending PATH_UPDATE frames as a
+function of the traffic distribution scheme enforced by the on-path device. To
+prevent such behavior, the server SHOULD wait for at least X seconds to ensure
+this is about a connection migration and not a side effect of an on-path
+multi-interfaced device.
 
 
 Sharing Path Policies
 ---------------------
 
+TODO: should this whole section be part of a companion draft?
+
 Some access networks are subject to a volume quota. To prevent a peer from
-aggressively using a given path while available resources can be freely
-grabbed using existing paths, it is desirable to support a signal to indicate
-to a remote peer how it must place data into available paths. An approach may
+aggressively using a given network path while available resources can be freely
+grabbed using existing uniflows, it is desirable to support a signal to indicate
+to a remote peer how it must place data into available uniflows. An approach may
 consist in indicating in an ADD_ADDRESS the type of the interface (e.g.,
-cellular, WLAN, fixed) through the interface-type field. The remote peer may rely on
-interface-type to select the path to be used for sending data. For example,
-fixed interfaces will be preferred over WLAN and cellular interfaces, and WLAN
-interface will be preferred over cellular interface.
+cellular, WLAN, fixed) through the interface-type field. The remote peer may
+rely on interface-type to select the uniflow to be used for sending data. For
+example, fixed interfaces will be preferred over WLAN and cellular interfaces,
+and WLAN interface will be preferred over cellular interface.
 
 This information might also be used to avoid draining battery for some devices.
 
@@ -741,15 +762,18 @@ This information might also be used to avoid draining battery for some devices.
 Congestion Control
 ------------------
 
+TODO: should this whole section be part of a companion draft?
+
 The QUIC congestion control scheme is defined in {{I-D.ietf-quic-recovery}}.
-This congestion control scheme is not suitable when several sending paths are active.
-Using the congestion control scheme defined in {{I-D.ietf-quic-recovery}} with
-Multipath QUIC would result in unfairness. Each sending path of a Multipath QUIC
-connection MUST have its own congestion window. The windows of the different
-paths MUST be coupled together. Multipath TCP uses the LIA congestion control
-scheme specified in {{RFC6356}}. This scheme can immediately be adapted to
-Multipath QUIC. Other coupled congestion control schemes have been proposed
-for Multipath TCP such as {{OLIA}}.
+This congestion control scheme is not suitable when several sending uniflows are
+active. Using the congestion control scheme defined in
+{{I-D.ietf-quic-recovery}} with Multipath QUIC would result in unfairness. Each
+sending uniflow of a Multipath QUIC connection MUST have its own congestion
+window. The windows of the different sending uniflows MUST be coupled together.
+Multipath TCP uses the LIA congestion control scheme specified in {{RFC6356}}.
+This scheme can immediately be adapted to Multipath QUIC. Other coupled
+congestion control schemes have been proposed for Multipath TCP such as
+{{OLIA}}.
 
 
 Mapping Path ID to Connection IDs
