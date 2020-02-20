@@ -1,5 +1,6 @@
 *.xml
 *.txt
+!dict.txt
 *.pdf
 lib
 *~
