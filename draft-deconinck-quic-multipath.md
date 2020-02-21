@@ -4,7 +4,6 @@ abbrev: MP-QUIC
 docname: draft-deconinck-quic-multipath-03
 date: {DATE}
 category: std
-consensus: true
 updates:
 
 ipr: trust200902
@@ -131,7 +130,7 @@ With regular TCP and UDP, all the packets that belong to a given flow
 share the same 5-tuple that acts as an identifier for this flow. Such
 characterization prevents these flows from using multiple paths. QUIC
 {{I-D.ietf-quic-transport}} does not use the 5-tuple as an implicit
-connection identifier. A QUIC flow is identified a Connection ID. This
+connection identifier. A QUIC flow is identified by a Connection ID. This
 nables QUIC flows to cope with events affecting the 5-tuple, such as NAT
 rebinding or IP address changes. The QUIC connection migration feature,
 described in more details in {{I-D.ietf-quic-transport}}, is key to
@@ -187,12 +186,14 @@ Overview {#overview}
 ========
 
 The current design of QUIC {{I-D.ietf-quic-transport}} provides reliable
-transport with multiplexing and security. A wide range of devices on today's
-Internet are multihomed. Examples include smartphones equipped with both WLAN
-and cellular interfaces, but also regular dual-stack hosts that use both IPv4
-and IPv6. Experience with Multipath TCP has shown that the ability to combine
-different paths during the lifetime of a connection provides various benefits
-including bandwidth aggregation or seamless handovers {{RFC8041}},{{IETFJ}}.
+transport with multiplexing, confidentiality, integrity and authenticity of data
+flows. A wide range of devices on today's Internet are multihomed.
+Examples include smartphones equipped with both WLAN and cellular
+interfaces, but also regular dual-stack hosts that use both IPv4 and
+IPv6. Experience with Multipath TCP has shown that the ability to
+combine different paths during the lifetime of a connection provides
+various benefits including bandwidth aggregation or seamless handovers
+{{RFC8041}},{{IETFJ}}.
 
 The current design of QUIC does not enable multihomed devices to efficiently
 use different paths simultaneously. This draft proposes multipath extensions
@@ -208,8 +209,8 @@ with the following design goals:
 
 * The multipath extensions should handle the asymetrical nature of the networks
 
-We first explain why a multipath extension would be
-beneficial to QUIC and then describe it at a high level.
+We first explain why a multipath extension would be beneficial to QUIC
+and then describe it at a high level.
 
 
 Moving from Bidirectional Paths to Uniflows
@@ -1443,25 +1444,17 @@ Nonce Computation {#nonce-considerations}
 With Multipath QUIC, each uniflow has its own packet number space. With the
 current nonce computation {{I-D.ietf-quic-tls}}, using twice the same packet
 number over two different uniflows on the same direction leads to the same
-cryptographic nonce. Depending on the size of the Initial Value (and hence the
-nonce), there are two ways to mitigate this issue.
+cryptographic nonce. Using twice the same nonce MUST NOT happen, hence
+MP-QUIC has a different nonce computation than {{I-D.ietf-quic-tls}}
 
-If the Initial Value has a length of 8 bytes, then a packet number used on a
-given path MUST NOT be reused on another uniflow of the connection, and
-therefore at most 2^64 packets can be sent on a QUIC connection. This means
-there will be packet number skipping at uniflow level, but the packet number
-will remain monotonically increasing on each uniflow.
-
-If the Initial Value has a length of 9 or more, then the cryptographic nonce
-computation is now performed as follows. The nonce, N, is formed by combining
-the packet protection IV (either client_pp_iv_n or server_pp_iv_n) with the
-Uniflow ID and the packet number. The 64 bits of the reconstructed QUIC packet
-number in network byte order is left-padded with zeros to the size of the IV.
-The Uniflow ID encoded in its variable-length format is right-padded with zeros
-to the size of the IV. The Uniflow IV is computed as the exclusive OR of the
-padded Uniflow ID and the IV. The exclusive OR of the padded packet number and
-the Uniflow IV forms the AEAD nonce.
-
+the left most bits of nonce MUST be the Uniflow ID that identifies the
+current uniflow up to max_sending_uniflow_id. The remaining bits of the
+nonce is formed by an exclusive OR of the least signicant bits of the packet
+protection IV with the padded packet number (left-padded with 0s). The
+nonce MUST be left-padded with a 0 if max_sending_uniflow_id <= 2, and
+the max_sending_uniflow_id MUST NOT be higher than 2^61. If a uniflow has
+sent 2^62-max_sending_uniflow_id packets, another uniflow MUST be used
+to avoid re-using the same nonce.
 
 Validation of Exchanged Addresses {#validation_address}
 ---------------------------------
