@@ -717,7 +717,7 @@ be used if the peer advertises a value different from 0 for the
 
 An endhost MAY use the following transport parameter:
 
-max_sending_uniflow_id (0x0020):
+max_sending_uniflow_id (0x40):
 
  :  Indicate the support of the multipath extension presented in this document,
     regardless of the carried value. Its integer value puts an upper bound on
@@ -923,7 +923,7 @@ close the connection with a PROTOCOL_VIOLATION error.
 MP_NEW_CONNECTION_ID Frame {#mpnewconnectionidsec}
 --------------------------
 
-The MP_NEW_CONNECTION_ID frame (type=0x20) is an extension of the
+The MP_NEW_CONNECTION_ID frame (type=0x40) is an extension of the
 NEW_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It keeps its
 ability to provide the peer with alternative Connection IDs and associates
 them to a particular uniflow using the Uniflow ID.
@@ -972,7 +972,7 @@ in Section 5.1 of {{I-D.ietf-quic-transport}}.
 MP_RETIRE_CONNECTION_ID Frame
 -----------------------------
 
-The MP_RETIRE_CONNECTION_ID frame (type=0x21) is an extension of the
+The MP_RETIRE_CONNECTION_ID frame (type=0x41) is an extension of the
 RETIRE_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It keeps its
 ability to indicate that the end-host will no longer use a Connection ID that
 was issued by its peer.
@@ -997,7 +997,7 @@ basis.
 MP_ACK Frame
 ------------
 
-The MP_ACK frame (types 0x22 and 0x23) is an extension of the ACK frame defined
+The MP_ACK frame (types 0x42 and 0x43) is an extension of the ACK frame defined
 by {{I-D.ietf-quic-transport}}. It allows hosts to acknowledge packets that were
 sent on non-initial uniflows.
 
@@ -1032,7 +1032,7 @@ numbers relate.
 ADD_ADDRESS Frame
 -----------------
 
-The ADD_ADDRESS frame (type=0x24) is used by a host to advertise its currently
+The ADD_ADDRESS frame (type=0x44) is used by a host to advertise its currently
 reachable addresses.
 
 The format of the ADD_ADDRESS frame is shown below.
@@ -1117,7 +1117,7 @@ exchanged.
 REMOVE_ADDRESS Frame
 --------------------
 
-The REMOVE_ADDRESS frame (type=0x25) is used by a host to signal that a
+The REMOVE_ADDRESS frame (type=0x45) is used by a host to signal that a
 previously announced address was lost.
 
 The format of the REMOVE_ADDRESS frame is shown below.
@@ -1156,7 +1156,7 @@ previously announced, the receiver MUST silently ignore the frame.
 UNIFLOWS Frame
 --------------
 
-The UNIFLOWS frame (type=0x26) communicates the uniflows' state of the sending
+The UNIFLOWS frame (type=0x46) communicates the uniflows' state of the sending
 host to the peer. It allows the sender to communicate its active uniflows to the
 peer in order to detect potential connectivity issue over uniflows.
 
@@ -1310,7 +1310,7 @@ the "QUIC Transport Parameters" registry under the "QUIC Protocol" heading.
 
 | Value  | Parameter Name         | Specification     |
 |:-------|:-----------------------|:------------------|
-| 0x0020 | max_sending_uniflow_id | {{tp-definition}} |
+|  0x40  | max_sending_uniflow_id | {{tp-definition}} |
 {: #iana-tp-table title="Addition to QUIC Transport Parameters Entries"}
 
 
