@@ -42,6 +42,7 @@ informative:
   RFC7050:
   RFC7225:
   RFC8041:
+  RFC3077:
   MPRTP:
      title: "MPRTP: Multipath considerations for real-time media"
      date: "2013"
@@ -106,8 +107,8 @@ informative:
 
 --- abstract
 
-This document specifies extensions to the QUIC protocol to enable simultaneous
-usage of multiple paths for a single connection. Those extensions remain
+This document specifies extensions to the QUIC protocol to enable the simultaneous
+usage of multiple paths for a single connection. The proposed extensions remain
 compliant with the current single-path QUIC design and preserve the QUIC privacy
 features.
 
@@ -123,30 +124,35 @@ from one to another or use them simultaneously to aggregate bandwidth whenever
 needed. During the last years, several multipath extensions to transport
 protocols have been proposed {{RFC6824}},{{MPRTP}}, {{SCTPCMT}}. Multipath TCP
 {{RFC6824}} is the most mature one. It is already deployed on popular
-smartphones, but also for other use cases {{RFC8041}}.
+smartphones, but also for other use cases {{RFC8041}}{{IETFJ}}.
 
 With regular TCP and UDP, all the packets that belong to a given flow
-share the same 5-tuple that acts as an identifier for this flow. Such
-characterization prevents these flows from using multiple paths. QUIC
+share the same 5-tuple that acts as an identifier for this flow. This prevents
+these flows from using multiple paths. QUIC
 {{I-D.ietf-quic-transport}} does not use the 5-tuple as an implicit
 connection identifier. A QUIC flow is identified by a Connection ID. This
-enables QUIC flows to cope with events affecting the 5-tuple, such as NAT
+enables QUIC to cope with events affecting the 5-tuple, such as NAT
 rebinding or IP address changes. The QUIC connection migration feature,
 specified in {{I-D.ietf-quic-transport}}, enables migrating a flow from one
-5-tuple to another one, sustaining a connection over multiple network paths.
+5-tuple to another one, sustaining a connection over different network paths.
 Still, there is a void to specify simultaneous usage of available network paths
 for a single connection. Use cases such as bandwidth aggregation or seamless
 network handovers would be applicable to QUIC, as they are now with Multipath
-TCP. An performance evaluation of an early solution for such use cases and a
+TCP {{RFC8041}}{{IETFJ}}. Experience with Multipath TCP on smartphones shows
+that the ability to simultaneously use Wi-Fi and cellular during handovers 
+improves the user perceived quality of experience. 
+A performance evaluation of an early solution for such use cases and a
 comparison between Multipath QUIC and Multipath TCP may be found in {{MPQUIC}}.
 
 In this document, we leverage many of the lessons learned from the
 design of Multipath TCP and the comments received on the first versions
-of this draft to propose extensions to the current QUIC design to
+of this document to propose extensions to the current QUIC design to
 enable it to simultaneously use several network paths. This document focuses
-mainly on network paths that are distinguishable by an endpoint. This document
+mainly on network paths that are distinguishable by the endpoints. 
+
+This document
 is organized as follows. It first provides in {{overview}} an overview of the
-operation of Multipath QUIC. It then states changes required in the current QUIC
+operation of Multipath QUIC. It then states the required changes in the current QUIC
 design {{I-D.ietf-quic-transport}} and specifies in {{spec}} the usage of
 multiple paths. Finally, it discusses some security considerations.
 
@@ -162,15 +168,15 @@ We assume that the reader is familiar with the terminology used in
 {{I-D.ietf-quic-transport}}. In addition, we define the following terms:
 
 - Uniflow: A unidirectional flow of packets between a QUIC host and its peer.
-  It is identified by an internal Uniflow ID. Packets sent over an uniflow use
+  This flow is identified by an internal Uniflow ID. Packets sent over a uniflow use
   a Destination Connection ID that may change during the lifetime of the
   connection. When being in use, an uniflow is temporarily bound to a 4-tuple
   (Source IP Address, Source Port Number, Destination IP Address, Destination
   Port Number).
 
-- Initial Uniflows: The two uniflows used by peers for the establishment of the
+- Initial Uniflows: The two uniflows used by peers for the establishment of a
   QUIC connection. One is the uniflow from the client to the server and the
-  other one is the uniflow from the server to the client. The cryptographic
+  other is the uniflow from the server to the client. The cryptographic
   handshake is done on these uniflows. These are identified by Uniflow ID 0.
 
 
@@ -204,11 +210,11 @@ with the following design goals:
 * The simultaneous usage of multiple uniflows should not introduce new privacy
   concerns
 
-* Hosts must ensure that all the paths it uses actually reaches its peer to
+* Hosts must ensure that all the paths it uses actually reach its peer to
   avoid packet flooding towards a victim (see Section 21.12.3 of
   {{I-D.ietf-quic-transport}})
 
-* The multipath extensions should handle the asymmetrical nature of the networks
+* The multipath extensions should handle the asymmetrical nature of networks
 
 We first explain why a multipath extension would be beneficial to QUIC
 and then describe it at a high level.
@@ -218,10 +224,10 @@ Moving from Bidirectional Paths to Uniflows
 -------------------------------------------
 
 To understand the overall architecture of the multipath extensions, let us
-first refine the notion of "path". Since the early days of computer networks,
+first refine the notion of "path". Since the early days of TCP/IP,
 a path was denoted by a 4-tuple (Source IP Address, Source Port Number,
 Destination IP Address, Destination Port Number). In QUIC, this is namely a UDP
-road from the local host to the remote one. Considering a smartphone interacting
+path from the local host to the remote one. Considering a smartphone interacting
 with a single-homed server, the smartphone might want to use one path over the
 WLAN network and another over the cellular one. Those paths are not necessarily
 disjoint. For example, when interacting with a dual-stack server, a smartphone
@@ -229,9 +235,10 @@ may create two paths over the Wi-Fi network: one over IPv4 and the other one
 over IPv6.
 
 A regular QUIC connection is composed of two independent active packet flows.
-The first flows packets from the client to the server and the other flows
+The first flow gathers the packets from the client to the server and the other the
 packets from the server to the client. To illustrate this, let us consider the
-{{examplequic}} below.
+{{examplequic}} below. The client has two IP addresses: IPc1 and IPc2. The server
+has a single address: IPs1.
 
 ~~~~~~~~~~
                   Probed flow IPc2 to IPs1
@@ -248,29 +255,28 @@ packets from the server to the client. To illustrate this, let us consider the
 {: #examplequic title="Identifying Unidirectional Flows in QUIC"}
 
 The client initiates the QUIC connection by sending packets towards the server.
-The server can then reply to the client with other packets and if the handshake
-succeeds, the connection is established. This process serves at establishing the
-connection path between end-hosts. Still, this "path" actually consists in two
+The server then replies to the client. If the handshake
+succeeds, the connection is established. Still, this "path" actually consists in two
 independent UDP flows. Each host has its own view of i) the 4-tuple used to send
 packets and ii) the 4-tuple on which it receives packets. While the 4-tuple used
 by the client to send packets may be the same as the one seen and used by the
-server, it is not necessarily the case with the presence of in-network
+server, this is nt always the case since 
 middleboxes that may alter the 4-tuple of packets (e.g., NATs). To further
 emphasize on this flow asymmetry, QUIC embeds a path validation mechanism
-{{I-D.ietf-quic-transport}} that checks if a host can reach its peer through a
+{{I-D.ietf-quic-transport}} that checks whether a host can reach its peer through a
 given 4-tuple. This process is unidirectional, i.e., the sender checks that it
-can reach its receiver, but not the reverse. A host receiving a PATH_CHALLENGE
-frame on a new 4-tuple may in turn initiates a path validation, but this is up
+can reach the receiver, but not the reverse. A host receiving a PATH_CHALLENGE
+frame on a new 4-tuple may in turn initiate a path validation, but this is up
 to the peer.
 
-[comment]: # (Maybe talk about satellite earlier)
+[comment]: # (Maybe talk about satellite earlier, OB note sure this is needed) 
 
 A QUIC connection is a collection of unidirectional flows, or uniflows. A plain
-QUIC one has one main uniflow from client to server and one main uniflow from
-server to client, each having their own Connection ID. These uniflows are
+QUIC connection is composed of a main uniflow from client to server and another main uniflow from
+server to client. These uniflows have their own Connection ID. They are
 host-specific, i.e., the uniflow(s) from A to B are different from the ones from
-B to A. This potentially enables the use of unidirectional networks such as
-satellites, which cannot be used with TCP.
+B to A. This potentially enables the use of unidirectional links such as
+non-broadcast satellite links {{RFC3077}}, which cannot be used with TCP.
 
 
 Beyond Connection Migration
@@ -282,20 +288,23 @@ Connection ID(s), placed in the public header of each QUIC packet. This
 enables hosts to continue the connection even if the 4-tuple changes due to,
 e.g., NAT rebinding. This ability to shift a connection from one 4-tuple to
 another is called Connection Migration. One of its use cases is fail-over when
-the IP address in use fails but another one is available. A device losing the
+the IP address in use fails but another one is available. A smartphone losing the
 WLAN connectivity can then continue the connection over its cellular interface,
 for instance.
 
-A QUIC peer can thus start on a given set of uniflows, denoted as the initial
+A QUIC connection can thus start on a given set of uniflows, denoted as the initial
 uniflows, and end on another ones. However, the current QUIC design
 {{I-D.ietf-quic-transport}} assumes that only one pair of uniflows is in use for
 a given connection. The specification does not support means to distinguish path
 migration from simultaneous usage of available uniflows for a given connection.
 
-This document fills that void. This draft first proposes mechanisms to
+[comment]: # (OB last sentence in previous para unclear)
+
+
+This document fills that void. It first proposes mechanisms to
 communicate endhost addresses to the peer. It then leverages the Address
-Validation procedure with the PATH_CHALLENGE and PATH_RESPONSE frames dexcribed
-in Section 8 of {{I-D.ietf-quic-transport}} to verify whether additional
+Validation procedure with PATH_CHALLENGE and PATH_RESPONSE frames described
+in Section 8 of {{I-D.ietf-quic-transport}} to verify whether the additional
 addresses advertised by the host are reachable. In this case, those addresses
 can be used to initiate new uniflows to spread packets over several networks
 following a packet scheduling policy that is out of scope of this document.
@@ -305,11 +314,12 @@ management considerations.
 
 The example of {{examplempquic}} illustrates a data exchange between a
 dual-homed client sending a request spanning two packets and a single-homed
-server. Uniflow IDs are idenpendently chosen by each host. In the presented
-example, the phone sends packets over WLAN on uniflow 0 and over LTE on uniflow
-1, while the packets sent by the server over WLAN are on uniflow 2 and over LTE
-are on uniflow 1.
+server. Uniflow IDs are idependently chosen by each host. In the presented
+example, the client sends packets over WLAN on uniflow 0 and over LTE on uniflow
+1, while the packets sent by the server over WLAN are on uniflow 2 and 
+those over LTE are on uniflow 1.
 
+[comment]: # (OB, PN numbers look strange) 
 
 ~~~~~~~~~~
 Server                        Phone                        Server
@@ -338,7 +348,7 @@ via WLAN                                                  via LTE
 {: #examplempquic title="Data flow with Multipath QUIC"}
 
 
-The remaining of this section focuses on providing a high-level overview of the
+The remaining of this section presents a high-level overview of the
 multipath operations in QUIC.
 
 
@@ -354,15 +364,16 @@ support of the multipath extensions.
 Notice that a host advertising a value of 0 for the `max_sending_uniflow_id`
 transport parameter indicates that it does not want additional uniflows to send
 packets, but it still supports the multipath extensions. Such situation might be
-useful when the host does not require multiple sending uniflows for packet
+useful when the host does not require multiple uniflows for packet
 sending but still wants to let the peer use multiple uniflows to reach it.
 
 
 Architecture of Multipath QUIC
 ------------------------------
 
-To illustrate the architecture of a Multipath QUIC connection, consider the
+To illustrate the architecture of a Multipath QUIC connection, consider 
 {{uniflowsexample}}.
+
 
 ~~~~~~~~~~
 +--------+          CID A - Uniflow ID 1          +--------+
@@ -393,11 +404,11 @@ client. From the end-hosts' viewpoint, they observe two kinds of uniflows:
 Reconsidering the example in {{uniflowsexample}}, the client has two
 sending uniflows and three receiving uniflows. The server has three sending
 uniflows and two receiving uniflows. There is thus a one-to-one mapping between
-the sending uniflows of a host and the receiving uniflows of its peer. An
+the sending uniflows of a host and the receiving uniflows of its peer. A
 uniflow is seen as a sending uniflow from the sender's perspective and as a
 receiving uniflow from the receiver's viewpoint.
 
-Each uniflow is associated with a specific four-tuple and identified by an
+Each uniflow is associated with a specific four-tuple and identified by a
 Uniflow ID, as shown in {{architectural}}.
 
 ~~~~~~~~~~
@@ -441,26 +452,26 @@ Server state
 ~~~~~~~~~~
 {: #architectural title="Architectural view of Multipath QUIC for a host having N sending uniflows and M receiving uniflows"}
 
-As described before, a Multipath QUIC connection starts using the Initial
-Uniflows, identified by Uniflow ID 0. It can then spread packets over several
+As described before, a Multipath QUIC connection starts using two Initial
+Uniflows, identified by Uniflow ID 0 on each peer. The packets can then be spread over several
 uniflows. Each uniflow has its (set of) Uniflow Connection ID(s) (UCID) packets
-use to explicitly mark they belong to. Depending on the direction of the
+that are used to explicitly mark where they belong to. Depending on the direction of the
 uniflow, the host keeps either the Uniflow Source Connection ID (USCID, for the
 receiving uniflows) or the Uniflow Destination Connection ID (USCID, for the
 sending uniflows). Notice that the (set of) UDCID(s) of a sending uniflow of a
 host is the same as the (set of) USCID(s) of the corresponding receive uniflow
-of the remote. Preventing the linkability of different uniflows is an important
-requirement for the multipath extensions {{I-D.huitema-quic-mpath-req}}. Using
-UCIDs as implicit uniflow identifiers makes this linkability harder than having
-explicit signaling as in the early version of this draft and does not require
-public header change to keep invariants {{I-D.ietf-quic-invariants}}.
+of the remote peer. Preventing the linkability of different uniflows is an important
+requirement for multipath extensions {{I-D.huitema-quic-mpath-req}}. We address it by using
+UCIDs as implicit uniflow identifiers. This makes the linkability harder than having
+explicit signaling as in earlier version of this draft. Furthermore, it does not require
+any public header change and thus preserves the QUIC invariants {{I-D.ietf-quic-invariants}}.
 
 When an uniflow is in use, each endhost associates it with a network path. In
 practice, this consists in a particular 4-tuple over which packets are sent
 (resp. received) on a sending (resp. receiving) uniflow. Each endhost has a
 specific vision of the 4-tuple, which might differ between endhosts. For
 instance, a client might send data from a private IP address behind a NAT and
-the server will receive packets coming from the public NAT IP address. Notice
+the server will receive packets coming from the NAT's public IP address. Notice
 that while uniflows may share a common network path, this is not mandatory.
 
 Each uniflow is an independent flow of packets over a given network path.
@@ -480,22 +491,22 @@ Uniflow Establishment
 
 The `max_sending_uniflow_id` transport parameter exchanged during the
 cryptographic handshake fixes an upper bound on the number of sending uniflows a
-host want to support. Then, hosts provide to their peer Uniflow Connection IDs
+host wants to support. Then, hosts provide to their peer Uniflow Connection IDs
 to use on uniflows. Both hosts dynamically control how many sending uniflows can
 currently be in use by the peer, i.e., the number of different Uniflow IDs
 proposed to the peer. While the sender determines the upper bound of sending
 paths it can have, it is the receiver that initializes uniflows, as the sender
-needs a UCID communicated by the receiver before using an uniflow. Notice that
+needs a UCID communicated by the receiver before using a uniflow. Notice that
 the peers might advertise different values for the `max_sending_uniflow_id`
-transport parameters to their peer, setting different upper bounds to the
+transport parameters, setting different upper bounds to the
 sending and receiving uniflows of each host.
 
 Hosts initiate the creation of their receiving uniflows by sending
 MP_NEW_CONNECTION_ID frames (see {{mpnewconnectionidsec}}) which are an extended
-version of the NEW_CONNECTION_ID frame. This frame associates an UCID to an
+version of the NEW_CONNECTION_ID frame. This frame associates a UCID to a
 uniflow. Upon reception of the MP_NEW_CONNECTION_ID frame, a host can start
 using the proposed sending uniflow having the referenced Uniflow ID by marking
-sent packets with the provided UCID. Therefore, once a host sent such
+sent packets with the provided UCID. Therefore, once a host sends a
 MP_NEW_CONNECTION_ID frame, it announces that it is ready to receive packets
 from that Uniflow ID with the proposed UCID. As frames are encrypted, adding new
 uniflows over a QUIC connection does not leak cleartext identifiers
@@ -504,15 +515,15 @@ uniflows over a QUIC connection does not leak cleartext identifiers
 A server might provide several Uniflow Connection IDs for the same Uniflow IDs
 with multiple MP_NEW_CONNECTION_ID frames. This can be useful to cope with
 migration cases, as described in {{path-migration}}. Multipath QUIC is
-asymmetrical.
+thus asymmetrical.
 
 
 Exchanging Data over Multiple Uniflows
 --------------------------------------
 
-A QUIC packet acts as a container for one of more frames. Multipath QUIC uses
+A QUIC packet acts as a container for one or more frames. Multipath QUIC uses
 the same STREAM frames as QUIC to carry data. A byte offset is associated to the
-data payload. One of the key design decision of (Multipath) QUIC is that frames
+data payload. One of the key design decisions of (Multipath) QUIC is that frames
 are independent of the packets carrying them. This implies that a frame
 transmitted over one uniflow could be retransmitted later on another uniflow
 without any change. Furthermore, all current QUIC frames are idempotent and
@@ -534,11 +545,13 @@ potentially allows sending up to 2 * 2^64 packets on a QUIC connection since
 each uniflow has its own packet number space (see {{nonce-considerations}} for
 the detail of this limit).
 
-With the introduction of multiple uniflows, there is a need to acknowledge them
+[comment]: # (OB, acknowledge a uniflow looks strange to me) 
+
+With the introduction of multiple uniflows, there is a need to acknowledge themd
 separately. The Initial Uniflows (with Uniflow ID 0) are still acknowledged with
 regular ACK frames, such that no modification is introduced in a core frame. For
 the other uniflows, the multipath extensions introduce a MP_ACK frame which
-prepends the ACK frame with an Uniflow ID field indicating which receiving
+prepends the ACK frame with a Uniflow ID field indicating which receiving
 uniflow the host acknowledges. To better explain this, let us consider the
 situation illustrated in {{ack-uniflows}}.
 
@@ -565,19 +578,19 @@ Client                                                   Server
 {: #ack-uniflows title="Acknowledging packets sent on uniflows"}
 
 Here five uniflows are in use, two in the client to server direction and three
-in the reverse one. In this case, the client first sends a packet on its sending
-uniflow 1 (linked to the CID B). The server hence receives the packet on its
-receiving uniflow 1. Therefore, it generates a MP_ACK frame for the Uniflow ID 1
-and transmits it to the client. The server has the freedom to choose any of its
+in the reverse one. The client first sends a packet on its sending
+uniflow 1 (linked to CID B). The server receives the packet on its
+receiving uniflow 1. Therefore, it generates a MP_ACK frame for Uniflow ID 1
+and transmits it to the client. The server can choose any of its
 sending uniflows to transmit this frame. In the provided situation, the server
-sends its packets on its sending uniflow 2 (and the client will thus receives
-this packet on its receiving uniflow 2).
+sends its packets on uniflow 2. The client thus receives
+this packet on its receiving uniflow 2.
 
-Similarly, packets over a given uniflow might be acknowledged by (MP_)ACK frames
+Similarly, packets sent over a given uniflow might be acknowledged by (MP_)ACK frames
 sent on another uniflow that does not share the same network path. Looking at
-{{examplempquic}} again, the "Response 2" packet on server's sending uniflow 1
+{{examplempquic}} again, "Response 2" packet on server's sending uniflow 1
 with DCID D using the LTE network is acknowledged by a MP_ACK frame received on
-an uniflow using the Wi-Fi network.
+a uniflow using the Wi-Fi network.
 
 
 Exchanging Addresses
@@ -616,8 +629,8 @@ MP_NEW_CONNECTION_ID frames proposing the corresponding Uniflow Connection IDs
 to its peer. A sending uniflow is active when it has received its Uniflow
 Connection IDs and is bound to a validated 4-tuple. The UNIFLOWS frame indicates
 the local Address IDs that the uniflow uses from the sender's perspective. With
-this information, the remote can then validate the public address and associate
-the advertised with the perceived addresses.
+this information, the remote host can validate the public address and associate
+the advertised one with the perceived addresses.
 
 
 Coping with Address Removals
@@ -653,7 +666,7 @@ This congestion control scheme is not suitable when several sending uniflows are
 active. Using the congestion control scheme defined in
 {{I-D.ietf-quic-recovery}} with Multipath QUIC would result in unfairness. Each
 sending uniflow of a Multipath QUIC connection MUST have its own congestion
-control state. The windows of the different sending uniflows MUST be coupled
+control state. As for Multipath TCP, the windows of the different sending uniflows MUST be coupled
 together {{RFC6356}}.
 
 
@@ -675,17 +688,17 @@ are determined when the MP_NEW_CONNECTION_ID frames are exchanged.
 
 Hosts MUST accept packets coming from their peer using the UCIDs they proposed
 in the (MP_)NEW_CONNECTION_ID frames they sent and associate them with the
-corresponding receiving Uniflow ID. Upon reception of the
+corresponding receiving Uniflow ID. Upon reception of a
 (MP_)NEW_CONNECTION_ID frame, hosts MUST acknowledge it and MUST store the
 advertised Uniflow Destination Connection ID and the Uniflow ID of the proposed
 sending uniflow.
 
 Hosts MUST ensure that all advertised Uniflow Connection IDs are available
 for the whole connection lifetime, unless they have been retired by their peer
-in the meanwhile by the reception of a (MP_)RETIRE_CONNECTION_ID.
+in the meantime by the reception of a (MP_)RETIRE_CONNECTION_ID.
 
-Hosts MUST NOT send MP_NEW_CONNECTION_ID frames with an Uniflow ID greater than
-the value of `max_sending_uniflow_id` advertised by their peer.
+A host MUST NOT send MP_NEW_CONNECTION_ID frames with a Uniflow ID greater than
+the value of `max_sending_uniflow_id` advertised by its peer.
 
 
 Using Multiple Uniflows {#spec}
