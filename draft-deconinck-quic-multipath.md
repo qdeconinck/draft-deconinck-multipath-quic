@@ -1106,8 +1106,6 @@ Port:
 Upon reception of an ADD_ADDRESS frame, the receiver SHOULD store the
 communicated address for future use.
 
-TODO link with AVP
-
 The receiver MUST NOT send packets others than validation ones to the
 communicated address without having validated it as specified in Section 8 of
 {{I-D.ietf-quic-transport}}. ADD_ADDRESS frames SHOULD contain globally
