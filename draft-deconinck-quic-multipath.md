@@ -704,7 +704,7 @@ Multipath Negotiation
 
 The Multipath negotiation takes place during the cryptographic handshake with
 the `max_sending_uniflow_id` transport parameter. A QUIC connection is initially
-single-path in QUIC. During this process, hosts advertise their support for
+single-path in QUIC. During this handshake, hosts advertise their support for
 multipath operations. When a host advertises a value for the
 `max_sending_uniflow_id` transport parameter, it indicates that it supports the
 multipath extensions, i.e., the extensions defined in this document (not to be
@@ -720,7 +720,7 @@ be used if the peer advertises a value different from 0 for the
 
 ### Transport Parameter Definition {#tp-definition}
 
-An endhost MAY use the following transport parameter:
+A host MAY use the following transport parameter:
 
 max_sending_uniflow_id (0x40):
 
@@ -740,7 +740,7 @@ learned remote IP addresses before starting sending packets to those addresses.
 This requirement is explained in {{validation_address}}. Hosts MUST initiate
 Address Validation Procedure as specified in {{I-D.ietf-quic-transport}}.
 
-A validated address MAY be cached for a given host for a limited amount of time.
+A host MAY cache a validated address for a limited amount of time.
 
 
 Receiving Uniflow State
@@ -780,13 +780,8 @@ Associated 4-tuple:
    this uniflow. This value is mutable, because a host might receive a packet
    with a different (possibly) validated remote address and/or port than the one
    previously recorded. If a host observes a change in the 4-tuple of the
-   receiving uniflow,
-
-   TODO link with considerations in transport document regarding the CID
-
-   If a host observes a change in the 4-tuple of the
-   receiving uniflow, it SHOULD send a MP_NEW_CONNECTION_ID with an increased
-   Retire Prior To field to make the peer change the Uniflow Connection ID.
+   receiving uniflow, it follows the considerations of Section 9.5 of
+   {{I-D.ietf-quic-transport}}.
 
 Associated local Address ID:
 
@@ -823,7 +818,7 @@ TODO: intermediate state for address validation? Yes
 +----------+ <------------------------------------ +----------+
                  address change or retired UCID
 ~~~~~~~~~~
-{: #snd_uniflow_state title="Finite-State Machine of sending uniflows"}
+{: #snd_uniflow_state title="Finite-State Machine describing the possible states of a sending uniflow"}
 
 Once a sending uniflow has been proposed by the peer in a received
 MP_NEW_CONNECTION_ID frame, it is in the UNUSED state. In this situation, hosts
@@ -885,18 +880,18 @@ Performance metrics:
 
  : Basic statistics such as one-way delay or the number of packets sent. This
    information can be useful when a host needs to perform packet scheduling
-   decisions and flow control management.
+   decisions and flow control.
 
 
 It might happen that a sending path is temporarily unavailable, because one of
 the endpoint's addresses is no more available or because the host retired all
 the UCIDs of the sending uniflow. In such cases, the path goes back to the
 UNUSED state. When performing a transition back to the UNUSED state, hosts MUST
-reset the additional state added by the ACTIVE state. In UNUSED state, the host
-MUST NOT send non-probing packets on it. At this state, the host might want to
-restart using the uniflow over another validated 4-tuple, switching the uniflow
-state back to the ACTIVE state. However, its congestion controller strate MUST
-be restarted and its performance metrics SHOULD be reset.
+reset the additional state added by the ACTIVE state. In the UNUSED state, the
+host MUST NOT send non-probing packets on it. At this state, the host might want
+to restart using the uniflow over another validated 4-tuple, switching the
+uniflow state back to the ACTIVE state. However, its congestion controller state
+MUST be restarted and its performance metrics SHOULD be reset.
 
 
 Losing Addresses
@@ -905,9 +900,10 @@ Losing Addresses
 During the lifetime of a connection, a host might lose addresses, e.g., a
 network interface that was shut down. All the ACTIVE sending uniflows that were
 using that local address MUST stop sending packets from that address. To
-advertise the address losses to the peer, the host MUST send a REMOVE_ADDRESS
-frame indicating which local Address IDs has been lost. The host MUST also
-send an UNIFLOWS frame indicating the status of the remaining ACTIVE paths.
+advertise the loss of an address to the peer, the host MUST send a
+REMOVE_ADDRESS frame indicating which local Address IDs has been lost. The host
+MUST also send an UNIFLOWS frame indicating the status of the remaining ACTIVE
+uniflows.
 
 Upon reception of the REMOVE_ADDRESS, the receiving host MUST stop using the
 ACTIVE sending uniflows affected by the address removal.
@@ -929,9 +925,9 @@ MP_NEW_CONNECTION_ID Frame {#mpnewconnectionidsec}
 --------------------------
 
 The MP_NEW_CONNECTION_ID frame (type=0x40) is an extension of the
-NEW_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It keeps its
-ability to provide the peer with alternative Connection IDs and associates
-them to a particular uniflow using the Uniflow ID.
+NEW_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It provides the
+peer with alternative Connection IDs and associates them to a particular uniflow
+using the Uniflow ID.
 
 The format of the MP_NEW_CONNECTION_ID frame is as follows.
 
@@ -978,9 +974,9 @@ MP_RETIRE_CONNECTION_ID Frame
 -----------------------------
 
 The MP_RETIRE_CONNECTION_ID frame (type=0x41) is an extension of the
-RETIRE_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It keeps its
-ability to indicate that the end-host will no longer use a Connection ID that
-was issued by its peer.
+RETIRE_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It indicates
+that the end-host will no longer use a Connection ID related to a given uniflow
+that was issued by its peer.
 
 The format of the MP_RETIRE_CONNECTION_ID frame is shown below.
 
@@ -1299,7 +1295,7 @@ To use addresses communicated by the peer through ADD_ADDRESS frames, hosts are
 required to validate them before using uniflows to these addresses as described
 in Section 8 of {{I-D.ietf-quic-transport}}. Section 21.12.3 of
 {{I-D.ietf-quic-transport}} provides additional motivation for this process. In
-addition, hosts must send ADD ADDRESS frames in 1-RTT frames to prevent off-path
+addition, hosts MUST send ADD ADDRESS frames in 1-RTT frames to prevent off-path
 attacks.
 
 
@@ -1508,8 +1504,8 @@ the available sending uniflows exhibit very different network characteristics.
 
 The progression of the data flow depends on the reception of the MAX_DATA and
 MAX_STREAM_DATA frames. Those frames SHOULD be duplicated on several or all
-ACTIVE sending uniflows. This would limit the head-of-line blocking issue due to
-the transmission of the frames over a slow or lossy network path.
+ACTIVE sending uniflows. This helps to limit the head-of-line blocking issue due
+to the transmission of the frames over a slow or lossy network path.
 
 The sending path on which (MP_)ACK frames are sent impacts the peer. The
 (MP_)ACK frame is notably used to determine the latency of a combination of
