@@ -1323,7 +1323,8 @@ feedback. We also want to thank Christian Huitema for his draft about
 multipath requirements to identify critical elements about the multipath
 feature. Mohamed Boucadair provided lot of useful inputs on the second version
 of this document. Maxime Piraux and Florentin Rochet helped us to improve the
-last versions of this draft.
+last versions of this draft. This project was partially supported by the MQUIC
+project funded by the Walloon Government.
 
 
 --- back
@@ -1535,6 +1536,9 @@ Since draft-deconinck-quic-multipath-03
 - Add a sequence number to frames involving Address ID events (#4)
 - Disallow Zero-length connection ID (#2)
 - Correctly handle nonce computation (thanks to Florentin Rochet)
+- Focus on the core concepts of multipath and delegate algorithms to companion
+  drafts
+- Updated text to match draft-ietf-quic-transport-27
 
 Since draft-deconinck-quic-multipath-02
 ---------------------------------------
