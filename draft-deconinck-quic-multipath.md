@@ -258,11 +258,11 @@ succeeds, the connection is established. Still, this "path" actually consists in
 two independent UDP flows. Each host has its own view of (i) the 4-tuple used to
 send packets and (ii) the 4-tuple on which it receives packets. While the 4-tuple
 used by the client to send packets may be the same as the one seen and used by
-the server, this is not always the case since middleboxes (e.g., NATs) that may alter the
+the server, this is not always the case since middleboxes (e.g., NATs) may alter the
 4-tuple of packets. 
 
 To further emphasize on this flow asymmetry,
-QUIC embeds a path validation mechanism {{I-D.ietf-quic-transport}} that is meant to check
+QUIC embeds a path validation mechanism {{I-D.ietf-quic-transport}} assessing
 whether a host can reach its peer through a given 4-tuple. This process is
 unidirectional, i.e., the sender checks that it can reach the receiver, but not
 the reverse. A host receiving a PATH_CHALLENGE frame on a new 4-tuple may in
@@ -301,7 +301,7 @@ communicate endhost addresses to the peer. It then leverages the Address
 Validation procedure with PATH_CHALLENGE and PATH_RESPONSE frames described
 in Section 8 of {{I-D.ietf-quic-transport}} to verify whether the additional
 addresses advertised by the host are reachable. In this case, those addresses
-can be used to initiate new uniflows to spread packets over several paths
+can be used to initiate new uniflows to spread packets over several network paths
 following a packet scheduling policy that is out of scope of this document.
 
 TODO: Add a companion document discussing the packet scheduling and path
