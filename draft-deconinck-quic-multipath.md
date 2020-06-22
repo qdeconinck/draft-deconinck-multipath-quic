@@ -309,7 +309,7 @@ management considerations.
 
 The example of {{examplempquic}} illustrates a data exchange between a
 dual-homed client sending a request spanning two packets and a single-homed
-server. Uniflow IDs are idependently chosen by each host. In the presented
+server. Uniflow IDs are independently chosen by each host. In the presented
 example, the client sends packets over WLAN on Uniflow 0 and over LTE on Uniflow
 1, while the packets sent by the server over WLAN are on Uniflow 2 and
 those over LTE are on Uniflow 1.
@@ -549,7 +549,7 @@ With the introduction of multiple uniflows, there is a need to acknowledge
 packets sent on different uniflows separately. The packets sent on Initial
 Uniflows (with Uniflow ID 0) are still acknowledged with regular ACK frames,
 such that no modification is introduced in a core frame. For the other
-uniflows, the multipath extensions introduce a MP_ACK frame which prepends the
+uniflows, the multipath extensions introduce a MP_ACK frame which prefixes the
 ACK frame with a Uniflow ID field indicating from which receiving uniflow the
 host acknowledges packets. To better explain this, let us consider the situation
 illustrated in {{ack-uniflows}}.
@@ -1286,11 +1286,11 @@ number over two different uniflows on the same direction leads to the same
 cryptographic nonce. Using twice the same nonce MUST NOT happen, hence
 MP-QUIC has a different nonce computation than {{I-D.ietf-quic-tls}}
 
-the left most bits of nonce MUST be the Uniflow ID that identifies the
+The left most bits of nonce MUST be the Uniflow ID that identifies the
 current uniflow up to max_sending_uniflow_id. The remaining bits of the
-nonce is formed by an exclusive OR of the least signicant bits of the packet
-protection IV with the padded packet number (left-padded with 0s). The
-nonce MUST be left-padded with a 0 if max_sending_uniflow_id <= 2, and
+nonce is formed by an exclusive OR of the least significant bits of the
+packet protection IV with the padded packet number (left-padded with 0s).
+The nonce MUST be left-padded with a 0 if max_sending_uniflow_id <= 2, and
 the max_sending_uniflow_id MUST NOT be higher than 2^61. If a uniflow has
 sent 2^62-max_sending_uniflow_id packets, another uniflow MUST be used
 to avoid re-using the same nonce.
@@ -1345,7 +1345,7 @@ Comparison with Multipath TCP
 Multipath TCP {{RFC6824}} is currently the most widely deployed multipath
 transport protocol on the Internet. While its design impacted the initial
 versions of the Multipath extensions for the QUIC protocol, there are now major
-differences between boths protocols that we now highlight.
+differences between both protocols that we now highlight.
 
 Multipath TCP Bidirectional Paths vs. QUIC Uniflows
 ---------------------------------------------------
