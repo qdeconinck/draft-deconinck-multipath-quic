@@ -29,6 +29,7 @@ author:
 
 normative:
   RFC2119:
+  RFC8174:
   I-D.ietf-quic-transport:
   I-D.ietf-quic-tls:
   I-D.ietf-quic-recovery:
@@ -121,29 +122,32 @@ Introduction
 
 Today's endhosts are equipped with several
 network interfaces. Users expect to be able to seamlessly switch
-from one interface to another one or use them simultaneously to aggregate bandwidth whenever
-needed. During the last years, several multipath extensions to transport
-protocols have been proposed (e.g., {{RFC6824}}, {{MPRTP}}, or {{SCTPCMT}}). Multipath TCP
-{{RFC6824}} is the most mature one. It is already deployed on popular
-smartphones, but also for other use cases {{RFC8041}}{{IETFJ}}.
+from one interface to another one or use them simultaneously to aggregate
+bandwidth whenever needed. During the last years, several multipath extensions
+to transport protocols have been proposed (e.g., {{RFC6824}}, {{MPRTP}}, or
+{{SCTPCMT}}). Multipath TCP {{RFC6824}} is the most mature one. It is already
+deployed on popular smartphones, but also for other use cases {{RFC8041}}
+{{IETFJ}}.
 
 With regular TCP and UDP, all the packets that belong to a given flow
-share the same 4-tuple {source IP address, source port number, destination IP address, destination port number} that acts as an identifier for this flow. This prevents
-these flows from using multiple paths. 
+share the same 4-tuple {source IP address, source port number, destination IP
+address, destination port number} that acts as an identifier for this flow. This
+prevents these flows from using multiple paths.
 
 QUIC
 {{I-D.ietf-quic-transport}} does not use the 4-tuple as an implicit
-connection identifier. Instead, a QUIC flow is identified by a Connection ID. This
-enables QUIC to cope with events affecting the 4-tuple, such as NAT
+connection identifier. Instead, a QUIC flow is identified by a Connection ID.
+This enables QUIC to cope with events affecting the 4-tuple, such as NAT
 rebinding or IP address changes. The QUIC connection migration feature,
-specified in Section 9 of {{I-D.ietf-quic-transport}}, enables migrating a flow from one
-4-tuple to another one, sustaining in particular a connection over different network paths.
+specified in Section 9 of {{I-D.ietf-quic-transport}}, enables migrating a flow
+from one 4-tuple to another one, sustaining in particular a connection over
+different network paths.
 
-Still, there is a void to specify simultaneous usage of QUIC over available network paths
-for a single connection. Use cases such as bandwidth aggregation or seamless
-network handovers would be applicable to QUIC, as they are now with Multipath
-TCP {{RFC8041}}{{IETFJ}}. Experience with Multipath TCP on smartphones shows
-that the ability to simultaneously use WLAN and cellular during handovers
+Still, there is a void to specify simultaneous usage of QUIC over available
+network paths for a single connection. Use cases such as bandwidth aggregation
+or seamless network handovers would be applicable to QUIC, as they are now with
+Multipath TCP {{RFC8041}}{{IETFJ}}. Experience with Multipath TCP on smartphones
+shows that the ability to simultaneously use WLAN and cellular during handovers
 improves the user perceived quality of experience.
 A performance evaluation of an early solution for such use cases and a
 comparison between Multipath QUIC and Multipath TCP may be found in {{MPQUIC}}.
@@ -165,17 +169,19 @@ Conventions and Definitions
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
 "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
-"OPTIONAL" in this document are to be interpreted as described in BCP 14 {{RFC2119}} {{RFC8174}} when, and only when, they appear in all capitals, as shown here.
+"OPTIONAL" in this document are to be interpreted as described in BCP 14
+{{RFC2119}} {{RFC8174}} when, and only when, they appear in all capitals, as
+shown here.
 
 We assume that the reader is familiar with the terminology used in
 {{I-D.ietf-quic-transport}}. In addition, we define the following terms:
 
 - Uniflow: A unidirectional flow of packets between a QUIC host and its peer.
-  This flow is identified by an internal identifier, called Uniflow ID. Packets sent over a uniflow
-  use a Destination Connection ID that may change during the lifetime of the
-  connection. When being in use, an uniflow is temporarily bound to a 4-tuple
-  (Source IP Address, Source Port Number, Destination IP Address, Destination
-  Port Number).
+  This flow is identified by an internal identifier, called Uniflow ID. Packets
+  sent over a uniflow use a Destination Connection ID that may change during the
+  lifetime of the connection. When being in use, an uniflow is temporarily bound
+  to a 4-tuple (Source IP Address, Source Port Number, Destination IP Address,
+  Destination Port Number).
 
 - Initial Uniflows: The two uniflows used by peers for the establishment of a
   QUIC connection. One is the uniflow from the client to the server and the
@@ -194,11 +200,11 @@ Overview {#overview}
 ========
 
 The design of QUIC {{I-D.ietf-quic-transport}} provides reliable
-transport with multiplexing, confidentiality, integrity, and authenticity of data
-flows. A wide range of devices on today's Internet are multihomed.
+transport with multiplexing, confidentiality, integrity, and authenticity of
+data flows. A wide range of devices on today's Internet are multihomed.
 Examples include smartphones equipped with both WLAN and cellular
 interfaces, but also regular dual-stack hosts that use both IPv4 and
-IPv6. 
+IPv6.
 
 The current design of QUIC does not enable multihomed devices to efficiently
 use different paths simultaneously. This document proposes multipath extensions
@@ -214,7 +220,8 @@ with the following design goals:
   avoid packet flooding towards a victim (see Section 21.12.3 of
   {{I-D.ietf-quic-transport}})
 
-* The multipath extensions should handle the asymmetrical nature of paths between two peers.
+* The multipath extensions should handle the asymmetrical nature of paths
+  between two peers.
 
 We first explain why a multipath extension would be beneficial to QUIC
 and then describe it at a high level.
@@ -224,19 +231,20 @@ Moving from Bidirectional Paths to Uniflows
 -------------------------------------------
 
 To understand the overall architecture of the multipath extensions, let us
-first refine the notion of "path". A path may be denoted by a 4-tuple (Source IP Address, Source Port Number,
-Destination IP Address, Destination Port Number). In QUIC, this is namely a UDP
-path from the local host to the remote one. Considering a smartphone interacting
-with a single-homed server, the smartphone might want to use one path over the
-WLAN network and another over the cellular one. Those paths are not necessarily
-disjoint. For example, when interacting with a dual-stack server, a smartphone
-may create two paths over WLAN: one over IPv4 and the other one
-over IPv6.
+first refine the notion of "path". A path may be denoted by a 4-tuple (Source IP
+Address, Source Port Number, Destination IP Address, Destination Port Number).
+In QUIC, this is namely a UDP path from the local host to the remote one.
+Considering a smartphone interacting with a single-homed server, the smartphone
+might want to use one path over the WLAN network and another over the cellular
+one. Those paths are not necessarily disjoint. For example, when interacting
+with a dual-stack server, a smartphone may create two paths over WLAN: one over
+IPv4 and the other one over IPv6.
 
 A regular QUIC connection is composed of two independent active packet flows.
 The first flow gathers the packets from the client to the server and the other
 the packets from the server to the client. To illustrate this, let us consider
-the example depicted in {{examplequic}}. In this example, the client has two IP addresses: IPc1 and IPc2. The server has one single address: IPs1.
+the example depicted in {{examplequic}}. In this example, the client has two IP
+addresses: IPc1 and IPc2. The server has one single address: IPs1.
 
 ~~~~~~~~~~
                   Probed flow IPc2 to IPs1
@@ -253,13 +261,13 @@ the example depicted in {{examplequic}}. In this example, the client has two IP 
 {: #examplequic title="Identifying Unidirectional Flows in QUIC"}
 
 The client initiates the QUIC connection by sending packets towards the server.
-The server then replies to the client if it accepts the connection. If the handshake
-succeeds, the connection is established. Still, this "path" actually consists in
-two independent UDP flows. Each host has its own view of (i) the 4-tuple used to
-send packets and (ii) the 4-tuple on which it receives packets. While the 4-tuple
-used by the client to send packets may be the same as the one seen and used by
-the server, this is not always the case since middleboxes (e.g., NATs) may alter the
-4-tuple of packets. 
+The server then replies to the client if it accepts the connection. If the
+handshake succeeds, the connection is established. Still, this "path" actually
+consists in two independent UDP flows. Each host has its own view of (i) the
+4-tuple used to send packets and (ii) the 4-tuple on which it receives packets.
+While the 4-tuple used by the client to send packets may be the same as the one
+seen and used by the server, this is not always the case since middleboxes
+(e.g., NATs) may alter the 4-tuple of packets.
 
 To further emphasize on this flow asymmetry,
 QUIC embeds a path validation mechanism {{I-D.ietf-quic-transport}} assessing
@@ -268,12 +276,13 @@ unidirectional, i.e., the sender checks that it can reach the receiver, but not
 the reverse. A host receiving a PATH_CHALLENGE frame on a new 4-tuple may in
 turn initiate a path validation, but this is up to the peer.
 
-A QUIC connection is a collection of unidirectional flows (called, uniflows). A plain
-QUIC connection is composed of a main uniflow from client to server and another
-main uniflow from server to client. These uniflows have their own Connection IDs.
-They are host-specific, i.e., the uniflow(s) from A to B are different from the
-ones from B to A. This potentially enables the use of unidirectional links such
-as non-broadcast satellite links {{RFC3077}}, which cannot be used with TCP.
+A QUIC connection is a collection of unidirectional flows (called, uniflows). A
+plain QUIC connection is composed of a main uniflow from client to server and
+another main uniflow from server to client. These uniflows have their own
+Connection IDs. They are host-specific, i.e., the uniflow(s) from A to B are
+different from the ones from B to A. This potentially enables the use of
+unidirectional links such as non-broadcast satellite links {{RFC3077}}, which
+cannot be used with TCP.
 
 
 Beyond Connection Migration
@@ -301,8 +310,9 @@ communicate endhost addresses to the peer. It then leverages the Address
 Validation procedure with PATH_CHALLENGE and PATH_RESPONSE frames described
 in Section 8 of {{I-D.ietf-quic-transport}} to verify whether the additional
 addresses advertised by the host are reachable. In this case, those addresses
-can be used to initiate new uniflows to spread packets over several network paths
-following a packet scheduling policy that is out of scope of this document.
+can be used to initiate new uniflows to spread packets over several network
+paths following a packet scheduling policy that is out of scope of this
+document.
 
 TODO: Add a companion document discussing the packet scheduling and path
 management considerations.
@@ -454,7 +464,7 @@ belong to. Depending on the direction of the uniflow, the host keeps either the
 Uniflow Source Connection ID (USCID, for the receiving uniflows) or the Uniflow
 Destination Connection ID (USCID, for the sending uniflows). Notice that the
 (set of) UDCID(s) of a sending uniflow of a host is the same as the (set of)
-USCID(s) of the corresponding receive uniflow of the remote peer. 
+USCID(s) of the corresponding receive uniflow of the remote peer.
 
 Preventing the
 linkability of different uniflows is an important requirement for the multipath
@@ -478,8 +488,8 @@ bandwidth, ...). To handle this, each uniflow has its own packet sequence number
 space.
 
 In addition to the UCIDs, 4-tuple and packet number space, some additional
-information is maintained for each uniflow. The Uniflow ID identifies the uniflow at
-the frame level and ensures uniqueness of the nonce (see
+information is maintained for each uniflow. The Uniflow ID identifies the
+uniflow at the frame level and ensures uniqueness of the nonce (see
 {{nonce-considerations}} for details) while limiting the number of concurrently
 used uniflows.
 
@@ -494,7 +504,7 @@ to use on uniflows. Both hosts dynamically control how many sending uniflows can
 currently be in use by the peer, i.e., the number of different Uniflow IDs
 proposed to the peer. While the sender determines the upper bound of sending
 paths it can have, it is the receiver that initializes uniflows, as the sender
-needs a UCID communicated by the receiver before using a uniflow. 
+needs a UCID communicated by the receiver before using a uniflow.
 
 Notice that
 the peers might advertise different values for the `max_sending_uniflow_id`
@@ -522,8 +532,8 @@ Exchanging Data over Multiple Uniflows
 --------------------------------------
 
 A QUIC packet acts as a container for one or more frames. Multipath QUIC uses
-the same STREAM frames as QUIC to carry data. A byte offset is associated with the
-data payload. One of the key design of (Multipath) QUIC is that frames
+the same STREAM frames as QUIC to carry data. A byte offset is associated with
+the data payload. One of the key design of (Multipath) QUIC is that frames
 are independent of the packets carrying them. This implies that a frame
 transmitted over one uniflow could be retransmitted later on another uniflow
 without any change. Furthermore, all current QUIC frames are idempotent and
@@ -607,7 +617,7 @@ of a Multipath QUIC connection. A new ADD_ADDRESS frame is transmitted when a
 host has a new address. This ADD_ADDRESS frame is protected as other QUIC
 control frames, which implies that it cannot be spoofed by attackers. The
 communicated address MUST first be validated by the receiving host before it
-starts using it as described in Section 8 of {{I-D.ietf-quic-invariants}}. This
+starts using it as described in Section 8 of {{I-D.ietf-quic-transport}}. This
 process ensures that the advertised address actually belongs to the peer and
 that the peer can receive packets sent by the host on the provided address. It
 also prevents hosts from launching amplification attacks to a victim address.
@@ -649,15 +659,12 @@ Uniflow Migration {#path-migration}
 -----------------
 
 At a given time, a Multipath QUIC endpoint gathers a set of active sending and
-receiving uniflows, each associated to a 4-tuple. To address privacy issues due
-to the linkability of addresses with Connection IDs, hosts should avoid changing
-the 4-tuple used by a sending uniflow, as described in Section 8 of
-{{I-D.ietf-quic-invariants}}.
-
--- Med: I don't parse this sentence. Also, please check the section you cite in ietf-quic-invariants
-
-Multipath QUIC keeps the path migration ability
-and applies it to each uniflow independently.
+receiving uniflows, each associated to a 4-tuple. This association is mutable.
+Hosts can change the 4-tuple used by their sending uniflows at any time,
+enabling QUIC to migrate uniflows from one network path to another. Yet, to
+address privacy issues due to the linkability of addresses, hosts should avoid
+reusing the same Connection ID used by a sending uniflow when the 4-tuple
+changes, as described in Section 9.5 of {{I-D.ietf-quic-transport}}.
 
 
 Congestion Control
