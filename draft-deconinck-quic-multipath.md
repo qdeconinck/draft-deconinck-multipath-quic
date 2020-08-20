@@ -1,7 +1,7 @@
 ---
 title: Multipath Extensions for QUIC (MP-QUIC)
 abbrev: MP-QUIC
-docname: draft-deconinck-quic-multipath-04
+docname: draft-deconinck-quic-multipath-05
 date: {DATE}
 category: std
 consensus: true
@@ -1543,6 +1543,11 @@ network overhead.
 
 Change Log
 ==========
+
+Since draft-deconinck-quic-multipath-04
+---------------------------------------
+
+- Mostly editorial and reference fixes
 
 Since draft-deconinck-quic-multipath-03
 ---------------------------------------
