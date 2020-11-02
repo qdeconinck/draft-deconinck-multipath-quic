@@ -361,6 +361,12 @@ defined in this document are negotiated using the `max_sending_uniflow_id`
 transport parameter. Any value for this transport parameter advertises the
 support of the multipath extensions.
 
+When negotiating the multipath extensions, the host puts a upper bound on the
+number of sending uniflows that it will use over the connection. For instance,
+if a host wants to spread connection's packets on at most two network paths, it
+advertises a `max_sending_uniflow_id` of 1. Note that the creation of a second
+sending uniflow will depend on the peer, as described later.
+
 Notice that a host advertising a value of 0 for the `max_sending_uniflow_id`
 transport parameter indicates that it does not want additional uniflows to send
 packets, but it still supports the multipath extensions. Such situation might be
@@ -670,7 +676,7 @@ Handling Multiple Network Paths
 The simultaneous usage of several sending uniflows introduces new algorithms
 (packet scheduling, path management) whose specifications are out of scope of
 this document. Nevertheless, these algorithms are actually present in any
-multipath-enabled transport protocol like Multipath TCP, CMT-SMTP and
+multipath-enabled transport protocol like Multipath TCP, CMT-SCTP and
 Multipath DCCP. A companion draft {{I-D.bonaventure-iccrg-schedulers}} provides
 several general-purpose packet schedulers depending on the application goals. A
 similar document can be created to discuss path/uniflow management
@@ -1417,99 +1423,6 @@ ACK Frame
 Since frames are independent of packets, and the uniflow notion relates to the
 packets, the (MP_)ACK frames can be sent on any uniflow, unlike Multipath TCP
 {{RFC6824}} which is constrained to send ACKs on the same path.
-
-
-To move in companion drafts
-===========================
-
-Uniflow Establishment
----------------------
-
-Sending useful data on a fresh new sending uniflow might lead to poor
-performance as the network path used by the QUIC uniflow might not be usable. A
-typical case is when a server wants to initiate a new sending uniflow to a
-client behind a NAT. The client would possibly never receive this packet,
-leading to connectivity issues on that uniflow. In addition, an opportunistic
-usage of network paths might also lead to possible attacks, such as a client
-advertising the IP address of a victim hoping that the server will flood it. To
-avoid these issues, a remote address MUST have been validated as described in
-{{I-D.ietf-quic-transport}} before associating it on a sending uniflows.
-
-Because attaching to new networks may be volatile and an endpoint does not have
-full visibility on multiple paths that may be available (e.g., hosts connected
-to a CPE), a Multipath QUIC capable endhost SHOULD advertise a
-`max_sending_uniflow_id` value of at least 1 and SHOULD propose at least 2
-receiving uniflows to its peer.
-
-
-Exchanging Addresses
---------------------
-
-Likewise, the client may be located behind a NAT64. As such it may announce an
-IPv6 address in an ADD_ADDRESS frame, that will be received over IPv4 by an
-IPv4-only server. The server should not discard that address, even if it is not
-IPv6-capable.
-
-An IPv6-only client may also receive from the server an ADD_ADDRESS frame which
-may contain an IPv4 address. The client should rely on means, such as
-{{RFC7050}} or {{RFC7225}}, to learn the IPv6 prefix to build an IPv4-converted
-IPv6 address.
-
-Hosts that are connected behind an address sharing mechanism may collect the
-external IP address and port numbers assigned to the hosts and then use their
-addresses in the ADD_ADDRESS. Means to gather such information include, but not
-limited to, UPnP IGD, PCP, or STUN.
-
-
-Uniflow Migration
------------------
-
-At a given time, a Multipath QUIC endpoint gathers a set of active sending and
-receiving uniflows, each associated to a 4-tuple. To address privacy issues due
-to the linkability of addresses with Connection IDs, hosts should avoid changing
-the 4-tuple used by a sending uniflow. There still remain situations where this
-change is unavoidable. These can be categorized into two groups: host-aware
-changes (e.g., network handover from Wi-Fi to cellular) and host-unaware changes
-(e.g., NAT rebinding).
-
-For the host-aware case, let us consider the case of a Multipath QUIC connection
-where the client is a smartphone with both Wi-Fi and cellular. It advertised
-both addresses and the server currently enables only one client's sending
-uniflow, the initial one. The Initial Uniflow uses the Wi-Fi address. Then, for
-some reason, the Wi-Fi address becomes unusable. To preserve connectivity, the
-client might then decide to use the cellular address for its Initial sending
-uniflow. It thus sends a REMOVE_ADDRESS announcing the loss of the Wi-Fi address
-and an UNIFLOWS frame to inform that its Initial sending uniflow is now using
-the cellular address. If the cellular address validation succeeds (which could
-have been done as soon as the cellular address was advertised), the server can
-continue exchanging data through the cellular address.
-
-However, both server and client might want to change the Connection ID used on
-the cellular address for privacy concerns. If the server provides an additional
-connection ID for the given uniflow (e.g., with Sequence Number 1) through
-MP_NEW_CONNECTION_ID frame at the beginning of the connection, the client can
-directly perform the Connection ID change and stop using the previous Connection
-ID on the cellular network. The client can then send the REMOVE_ADDRESS and
-UNIFLOWS frames on this uniflow, and advertise the end of the usage of the old
-Connection ID using MP_RETIRE_CONNECTION_ID. Compared to the previous case, it
-is harder to link the uniflows with the IP addresses to observe that they belong
-to the same Multipath QUIC connection.
-
-For the host-unaware case, the situation is similar. In case of NAT rebinding,
-the server will observe a change in the 2-tuple (source IP, source port) of the
-receiving uniflow of the packet. The server first validates that the 2-tuple
-actually belongs to the client {{I-D.ietf-quic-transport}}. If it is the case,
-the server can send a PATH_UPDATE frame on a previously communicated but unused
-Uniflow ID. The client might have sent some packets with a given UCID on a
-different 4-tuple, but the server did not use the given UCID on that 4-tuple.
-Because some on-path devices may rewrite the source IP address to forward
-packets via the available network attachments (e.g., a host located behind a
-multi-homed CPE), the server may inadvertently conclude that an uniflow is not
-anymore valid leading thus to frequently sending PATH_UPDATE frames as a
-function of the traffic distribution scheme enforced by the on-path device. To
-prevent such behavior, the server SHOULD wait for at least X seconds to ensure
-this is about a connection migration and not a side effect of an on-path
-multi-interfaced device.
 
 
 Change Log
