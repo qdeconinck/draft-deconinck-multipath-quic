@@ -108,10 +108,12 @@ informative:
 
 This document specifies extensions to the QUIC protocol to enable the
 simultaneous usage of multiple paths for a single connection.
-
 These extensions are compliant with the single-path QUIC design and
 preserve QUIC privacy features.
 
+Discussion about this draft is encouraged either on the QUIC IETF mailing list
+quic@ietf.org or on the GitHub repository which contains the draft:
+https://github.com/qdeconinck/draft-deconinck-multipath-quic.
 
 --- middle
 
@@ -157,9 +159,13 @@ enable it to simultaneously use several network paths. This document focuses
 mainly on network paths that are distinguishable by the endpoints.
 
 This document is organized as follows. It first provides in {{overview}} an
-overview of the operation of Multipath QUIC. It then states the required changes
-in the current QUIC design {{I-D.ietf-quic-transport}} and specifies in {{spec}}
-the usage of multiple paths. Finally, it discusses some security considerations.
+overview of the operation of Multipath QUIC. It then states in {{mapping}} how
+Connection IDs can map to different unidirectional flows (called uniflows) in
+use. {{spec}} specifies the required changes in the current QUIC design
+{{I-D.ietf-quic-transport}} to enable the simultaneous usage of multiple network
+paths. These extensions introduce new frames that are described in {{mpframes}}
+and {{extensionframe}}. Finally, {{security}} discusses some security
+considerations.
 
 
 Conventions and Definitions
@@ -694,7 +700,7 @@ uniflows MUST be coupled together {{RFC6356}}.
 
 
 
-Mapping Uniflow IDs to Connection IDs
+Mapping Uniflow IDs to Connection IDs {#mapping}
 =====================================
 
 As described in the overview section, hosts need to identify on which uniflows
@@ -943,7 +949,7 @@ Hosts MAY reuse one of these sending uniflows by changing the assigned 4-tuple.
 In this case, it MUST send an UNIFLOWS frame describing that change.
 
 
-New Frames
+New Frames {#mpframes}
 ==========
 
 To support the multipath operations, new frames have been defined to coordinate
@@ -1275,7 +1281,7 @@ The Uniflow Info section only contains the local Address ID so far, but this
 section can be extended later with other potentially useful information.
 
 
-Extension of the Meaning of Existing QUIC Frames
+Extension of the Meaning of Existing QUIC Frames {#extensionframe}
 ================================================
 
 The multipath extensions do not modify the wire format of existing QUIC frames.
@@ -1297,7 +1303,7 @@ ACK:
 
 
 
-Security Considerations
+Security Considerations {#security}
 =======================
 
 Nonce Computation {#nonce-considerations}
