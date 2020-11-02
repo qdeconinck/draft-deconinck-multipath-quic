@@ -37,6 +37,7 @@ normative:
 informative:
   I-D.huitema-quic-mpath-req:
   I-D.huitema-quic-1wd:
+  I-D.bonaventure-iccrg-schedulers:
   RFC0793:
   RFC6356:
   RFC6824:
@@ -313,9 +314,6 @@ addresses advertised by the host are reachable. In this case, those addresses
 can be used to initiate new uniflows to spread packets over several network
 paths following a packet scheduling policy that is out of scope of this
 document.
-
-TODO: Add a companion document discussing the packet scheduling and path
-management considerations.
 
 The example of {{examplempquic}} illustrates a data exchange between a
 dual-homed client sending a request spanning two packets and a single-homed
@@ -667,6 +665,19 @@ reusing the same Connection ID used by a sending uniflow when the 4-tuple
 changes, as described in Section 9.5 of {{I-D.ietf-quic-transport}}.
 
 
+Handling Multiple Network Paths
+-------------------------------
+
+The simultaneous usage of several sending uniflows introduces new algorithms
+(packet scheduling, path management) whose specifications are out of scope of
+this document. Nevertheless, these algorithms are actually present in any
+multipath-enabled transport protocol like Multipath TCP, CMT-SMTP and
+Multipath DCCP. A companion draft {{I-D.bonaventure-iccrg-schedulers}} provides
+several general-purpose packet schedulers depending on the application goals. A
+similar document can be created to discuss path/uniflow management
+considerations.
+
+
 Congestion Control
 ------------------
 
@@ -762,7 +773,6 @@ A host MAY cache a validated address for a limited amount of time.
 
 Receiving Uniflow State
 -----------------------
-
 
 When proposing uniflows to their peer, hosts need to maintain some state for
 their receiving uniflows. This state is created upon the sending of a first
