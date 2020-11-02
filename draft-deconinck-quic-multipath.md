@@ -36,7 +36,6 @@ normative:
   I-D.ietf-quic-invariants:
 informative:
   I-D.huitema-quic-mpath-req:
-  I-D.huitema-quic-1wd:
   I-D.bonaventure-iccrg-schedulers:
   RFC0793:
   RFC6356:
@@ -966,9 +965,12 @@ bytes in flight if the packet containing it only carries either ACK or MP_ACK
 frames. The MP_NEW_CONNECTION_ID frame is the only new frame that can be sent
 to probe new network paths.
 
+The remaining of this document uses the notation convention described in
+{{I-D.ietf-quic-transport}}.
 
-MP_NEW_CONNECTION_ID Frame {#frame-mp-new-connection-id}
---------------------------
+
+MP_NEW_CONNECTION_ID Frames {#frame-mp-new-connection-id}
+---------------------------
 
 The MP_NEW_CONNECTION_ID frame (type=0x40) is an extension of the
 NEW_CONNECTION_ID frame defined by {{I-D.ietf-quic-transport}}. It provides the
@@ -977,36 +979,31 @@ using the Uniflow ID.
 
 The format of the MP_NEW_CONNECTION_ID frame is as follows.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Uniflow ID (i)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      Sequence Number (i)                    ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      Retire Prior To (i)                    ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   Length (8)  |                                               |
-+-+-+-+-+-+-+-+-+       Connection ID (8..160)                  +
-|                                                             ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                                                               |
-+                                                               +
-|                                                               |
-+                   Stateless Reset Token (128)                 +
-|                                                               |
-+                                                               +
-|                                                               |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #mpnewconnectionid title="MP_NEW_CONNECTION_ID frame"}
+~~~
+MP_NEW_CONNECTION_ID Frame {
+  Type (i) = 0x40,
+  Uniflow ID (i),
+  Sequence Number (i),
+  Retire Prior To (i),
+  Length (8),
+  Connection ID (8..160),
+  Stateless Reset Token (128),
+}
+~~~
+{: #fig-mp-new-connection-id title="MP_NEW_CONNECTION_ID Frame Format"}
 
-Compared to the frame specified in {{I-D.ietf-quic-transport}}, an Uniflow ID
-varint field of is prefixed to associate the Connection ID with a uniflow. This
-frame can be sent by both hosts. Upon reception of the frame with a specified
-Uniflow ID, the peer MUST update the related sending uniflow state and store the
-communicated Connection ID.
+Compared to the NEW_CONNECTION_ID frame specified in
+{{I-D.ietf-quic-transport}}, the following field is added.
+
+Uniflow ID:
+
+ : Indicates to which uniflow the provided Connection ID relates.
+
+The remaining fields keep the same semantic as for the NEW_CONNECTION_ID frame.
+
+This frame can be sent by both hosts. Upon reception of the frame with a
+specified Uniflow ID, the peer MUST update the related sending uniflow state and
+store the communicated Connection ID.
 
 To limit the delay of the multipath usage upon handshake completion, hosts
 SHOULD send MP_NEW_CONNECTION_ID frames for receive uniflows they allow using as
@@ -1026,19 +1023,24 @@ that was issued by its peer.
 
 The format of the MP_RETIRE_CONNECTION_ID frame is shown below.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Uniflow ID (i)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      Sequence Number (i)                    ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #mpretireconnectionid title="MP_RETIRE_CONNECTION_ID frame"}
+~~~
+MP_RETIRE_CONNECTION_ID Frame {
+  Type (i) = 0x41,
+  Uniflow ID (i),
+  Sequence Number (i),
+}
+~~~
+{: #fig-mp-retire-connection-id title="MP_RETIRE_CONNECTION_ID Frame Format"}
 
-The frame is handled as described in {{I-D.ietf-quic-transport}} on an uniflow
-basis.
+Compared to the RETIRE_CONNECTION_ID frame specified in
+{{I-D.ietf-quic-transport}}, the following field is added.
+
+Uniflow ID:
+
+ : Indicates on which uniflow the Connection ID is retired.
+
+The frame is handled as the RETIRE_CONNECTION_ID frame described in
+{{I-D.ietf-quic-transport}} on an uniflow basis.
 
 
 MP_ACK Frame {#frame-mp-ack}
@@ -1046,34 +1048,32 @@ MP_ACK Frame {#frame-mp-ack}
 
 The MP_ACK frame (types 0x42 and 0x43) is an extension of the ACK frame defined
 by {{I-D.ietf-quic-transport}}. It allows hosts to acknowledge packets that were
-sent on non-initial uniflows.
+sent on non-initial uniflows. If the frame type is 0x43, MP_ACK frames also
+contain the sum of QUIC packets with associated ECN marks received on the
+connection up to this point.
 
 The format of the MP_ACK frame is shown below.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         Uniflow ID (i)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                    Largest Acknowledged (i)                 ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         ACK Delay (i)                       ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      ACK Range Count (i)                    ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      First ACK Range (i)                    ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         ACK Ranges (*)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                         [ECN Counts]                        ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #ack_frame title="ACK frame adapted to Multipath"}
+~~~
+MP_ACK Frame {
+  Type (i) = 0x02..0x03,
+  Uniflow ID (i),
+  Largest Acknowledged (i),
+  ACK Delay (i),
+  ACK Range Count (i),
+  First ACK Range (i),
+  ACK Range (..) ...,
+  [ECN Counts (..)],
+}
+~~~
+{: #fig-mp-ack title="MP_ACK Frame Format"}
 
-Compared to the ACK frame, the MP_ACK frame is prefixed by a varint
-Uniflow ID field indicating to which uniflow the acknowledged packet sequence
-numbers relate.
+Compared to the ACK frame specified in {{I-D.ietf-quic-transport}}, the
+following field is added.
+
+Uniflow ID:
+
+ : Indicates on which uniflow the acknowledged packet sequence numbers relate.
 
 
 ADD_ADDRESS Frame {#frame-add-address}
@@ -1084,55 +1084,52 @@ reachable addresses.
 
 The format of the ADD_ADDRESS frame is shown below.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|0|0|0|P|IPVers.|Address ID (8) |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Sequence Number (i)                   ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|Interface T.(8)|
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       IP Address (32/128)                   ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|          [Port (16)]          |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #add_address_frame title="ADD_ADDRESS Frame"}
+~~~
+ADD_ADDRESS Frame {
+  Type (i) = 0x44,
+  Rsv (3) = 0,
+  P (1),
+  IP Version (4),
+  Address ID (8),
+  Sequence Number (i),
+  Interface Type (8),
+  IP Address (32/128),
+  [Port (16)],
+}
+~~~
+{: #fig-add-address title="ADD_ADDRESS Frame Format"}
 
 The ADD_ADDRESS frame contains the following fields.
 
-Reserved bits:
+Rsv:
 
- : The three most-significant bits of the first byte are set to 0, and are
-   reserved for future use.
+ : These bits are set to 0, and are reserved for future use.
 
 P bit:
 
- : The fourth most-significant bit of the first byte indicates, if set, the
-   presence of the Port field.
+ : This bit indicates, if set, the presence of the Port field.
 
-IPVers.:
+IP Version:
 
- : The remaining four least-significant bits of the first byte contain the
-   version of the IP address contained in the IP Address field.
+ : Written on 4 bits, contains the version of the IP address contained in the
+   IP Address field.
 
 Address ID:
 
- : An unique identifier for the advertised address for tracking and removal
-   purposes. This is needed when, e.g., a NAT changes the IP address such that
-   both hosts see different IP addresses for a same network path.
+ : An one-byte unique identifier for the advertised address for tracking and
+   removal purposes. This is needed when, e.g., a NAT changes the IP address
+   such that both hosts see different IP addresses for a same network path.
 
 Sequence Number:
 
- : An Address ID related sequence number of the event. The sequence number space
-   is shared with REMOVE_ADDRESS frames mentioning the same Address ID.
+ : An Address ID related sequence number of the event, encoded as a
+   variable-length integer. The sequence number space is shared with
+   REMOVE_ADDRESS frames mentioning the same Address ID.
 
 Interface Type:
 
- : Used to provide an indication about the interface type to which this address
-   is bound. The following values are defined:
+ : A one-byte field providing an indication about the interface type to which
+   this address is bound. The following values are defined:
 
    * 0: fixed. Used as default value.
    * 1: WLAN
@@ -1167,30 +1164,29 @@ previously announced address was lost.
 
 The format of the REMOVE_ADDRESS frame is shown below.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+
-|Address ID (8) |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Sequence Number (i)                   ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #remove_address_frame title="REMOVE_ADDRESS Frame"}
+~~~
+REMOVE_ADDRESS Frame {
+  Type (i) = 0x45,
+  Address ID (8),
+  Sequence Number (i),
+}
+~~~
+{: #fig-remove-address title="REMOVE_ADDRESS Frame Format"}
 
 The REMOVE_ADDRESS frame contains the following fields.
 
 Address ID:
 
- : The identifier of the address to remove.
+ : The one-byte identifier of the address to remove.
 
 Sequence Number:
 
- : An Address ID related sequence number of the event. The sequence number space
-   is shared with ADD_ADDRESS frames mentioning the same Address ID. This help
-   the receiver figure out that a REMOVE_ADDRESS might have been sent before an
-   ADD_ADDRESS frame implying the same Address ID, even if for some reason the
-   REMOVE_ADDRESS reaches the receiver after the newer ADD_ADDRESS one.
+ : An Address ID related sequence number of the event, encoded as a
+   variable-length integer. The sequence number space is shared with ADD_ADDRESS
+   frames mentioning the same Address ID. This help the receiver figure out that
+   a REMOVE_ADDRESS might have been sent before an ADD_ADDRESS frame implying
+   the same Address ID, even if for some reason the REMOVE_ADDRESS reaches the
+   receiver after the newer ADD_ADDRESS one.
 
 
 A host SHOULD stop using sending uniflows using the removed address and set them
@@ -1203,41 +1199,37 @@ UNIFLOWS Frame {#frame-uniflows}
 
 The UNIFLOWS frame (type=0x46) communicates the uniflows' state of the sending
 host to the peer. It allows the sender to communicate its active uniflows to the
-peer in order to detect potential connectivity issue over uniflows.
+peer in order to detect potential connectivity issue over uniflows. It also
+enables hosts to map Address IDs to seen 4-tuples when middleboxes affecting
+them (e.g., NATs,...) are present.
 
 The format of the UNIFLOWS frame is shown below.
 
-~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                          Sequence (i)                       ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                      ReceivingUniflows (i)                  ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                   ActiveSendingUniflows (i)                 ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|               Receiving Uniflow Info Section (*)            ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                Sending Uniflow Info Section (*)             ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-~~~~~~~~~~
-{: #uniflows_frame title="UNIFLOWS Frame"}
+~~~
+UNIFLOWS Frame {
+  Type (i) = 0x46,
+  Sequence Number (i),
+  Receiving Uniflows (i),
+  Active Sending Uniflows (i),
+  Receiving Uniflow Info Section (..) ...,
+  Active Sending Uniflow Info Section (..) ...,
+}
+~~~
+{: #fig-uniflows-address title="UNIFLOWS Frame Format"}
 
 The UNIFLOWS frame contains the following fields.
 
-Sequence:
+Sequence Number:
 
  : A variable-length integer. This value starts at 0 and increases by 1 for each
    UNIFLOWS frame sent by the host. It allows identifying the most recent
    UNIFLOWS frame.
 
-ReceivingUniflows:
+Receiving Uniflows:
 
- : The current number of receiving uniflows considered as being usable from the
-   sender's point of view.
+ : The current number of receiving uniflows from the sender's point of view.
 
-ActiveSendingUniflows:
+Active Sending Uniflows:
 
  : The current number of sending uniflows in the ACTIVE state from the sender's
    point of view.
@@ -1245,33 +1237,24 @@ ActiveSendingUniflows:
 Receiving Uniflow Info Section:
 
  : Contains information about the receiving uniflows (there are
-   ReceivingUniflows entries).
+   Receiving Uniflows entries).
 
 Sending Uniflow Info Section:
 
  : Contains information about the sending uniflows in ACTIVE state (there are
-   ActiveSendingUniflows entries).
+   Active Sending Uniflows entries).
 
 
-Both Receiving Uniflow Info and Sending Uniflow Info Sections share the same
-format, which is shown below.
+Both Receiving Uniflow Info and Active Sending Uniflow Info Sections share the
+same format which is shown below.
 
 ~~~~~~~~~~
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Uniflow ID 0 (i)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|LocAddrID 0 (8)|
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-                               ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                       Uniflow ID N (i)                      ...
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|LocAddrID N (8)|
-+-+-+-+-+-+-+-+-+
+Uniflow Info Section {
+  Uniflow ID (i),
+  Local Address ID (8),
+}
 ~~~~~~~~~~
-{: #uniflow_info_section title="Uniflow Info Section"}
+{: #fig-uniflows-info-section title="Uniflow Info Section Format"}
 
 The fields in the Uniflow Info Section are the following.
 
@@ -1535,9 +1518,11 @@ Change Log
 Since draft-deconinck-quic-multipath-05
 ---------------------------------------
 
+- Summarize frame types in a table
+- Update frame format to structure style
 - Update text to match draft-ietf-quic-transport-32
 - Link to scheduling companion draft
-- Remove dangling TODOs
+- Remove dangling to-dos
 
 Since draft-deconinck-quic-multipath-04
 ---------------------------------------
