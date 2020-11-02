@@ -831,8 +831,6 @@ uniflows. The state of the sending uniflow determines information that hosts
 are required to store. The possible sending uniflow states are depicted in
 {{snd_uniflow_state}}.
 
-TODO: intermediate state for address validation? Yes
-
 ~~~~~~~~~~
       o
       |
@@ -875,6 +873,9 @@ Packet Number Space:
    considerations described in Section 12.3 of {{I-D.ietf-quic-transport}} apply
    within a given sending uniflow.
 
+
+Notice that a UNUSED sending uniflow MAY send probing packets to validate a
+given 4-tuple.
 
 When the host wants to start using the sending uniflow over a validated address,
 the sending uniflow goes to the ACTIVE state. This is the state where a sending
