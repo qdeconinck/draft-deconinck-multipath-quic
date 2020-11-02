@@ -1437,7 +1437,7 @@ avoid these issues, a remote address MUST have been validated as described in
 Because attaching to new networks may be volatile and an endpoint does not have
 full visibility on multiple paths that may be available (e.g., hosts connected
 to a CPE), a Multipath QUIC capable endhost SHOULD advertise a
-`max_sending_uniflow_id` value of at least 4 and SHOULD propose at least 4
+`max_sending_uniflow_id` value of at least 1 and SHOULD propose at least 2
 receiving uniflows to its peer.
 
 
@@ -1483,24 +1483,16 @@ the cellular address. If the cellular address validation succeeds (which could
 have been done as soon as the cellular address was advertised), the server can
 continue exchanging data through the cellular address.
 
-TODO: I don't think we have to change the Uniflow ID, we can just rely on
-(MP_)NEW_CONNECTION_ID and (MP_)RETIRE_CONNECTION_ID -- hence, not sure the
-PATH_UPDATE frame is required, but will depend on the use cases
-
-TODO: update following paragraph to remove PATH_UPDATE
-
-However, both server and client might want to change the uniflow used on the
-cellular address for privacy concerns. If the server provides an additional
-uniflow (e.g., with Uniflow ID 1) through MP_NEW_CONNECTION_ID frame at the
-beginning of the connection, the client can perform the network path change
-directly and avoid using the Initial Uniflow Connection ID on the cellular
-network. This can be done using the PATH_UPDATE frame. It can indicate that the
-host stopped to use the Initial sending uniflow to use the one with Uniflow ID
-1 instead. This frame is placed in the first packet sent to the new sending
-uniflow with its corresponding UCID. The client can then send the REMOVE_ADDRESS
-and UNIFLOWS frames on this new uniflow. Compared to the previous case, it is
-harder to link the uniflows with the IP addresses to observe that they belong to
-the same Multipath QUIC connection.
+However, both server and client might want to change the Connection ID used on
+the cellular address for privacy concerns. If the server provides an additional
+connection ID for the given uniflow (e.g., with Sequence Number 1) through
+MP_NEW_CONNECTION_ID frame at the beginning of the connection, the client can
+directly perform the Connection ID change and stop using the previous Connection
+ID on the cellular network. The client can then send the REMOVE_ADDRESS and
+UNIFLOWS frames on this uniflow, and advertise the end of the usage of the old
+Connection ID using MP_RETIRE_CONNECTION_ID. Compared to the previous case, it
+is harder to link the uniflows with the IP addresses to observe that they belong
+to the same Multipath QUIC connection.
 
 For the host-unaware case, the situation is similar. In case of NAT rebinding,
 the server will observe a change in the 2-tuple (source IP, source port) of the
@@ -1519,41 +1511,15 @@ this is about a connection migration and not a side effect of an on-path
 multi-interfaced device.
 
 
-Scheduling Strategies
----------------------
-
-The current QUIC design {{I-D.ietf-quic-transport}} offers a single scheduling
-space, i.e., which frames will be packed inside a given packet. With the
-simultaneous use of several sending uniflows, a second dimension is added,
-i.e., the sending uniflow on which the packet will be sent. This dimension can
-have a non negligible impact on the operations of Multipath QUIC, especially if
-the available sending uniflows exhibit very different network characteristics.
-
-The progression of the data flow depends on the reception of the MAX_DATA and
-MAX_STREAM_DATA frames. Those frames SHOULD be duplicated on several or all
-ACTIVE sending uniflows. This helps to limit the head-of-line blocking issue due
-to the transmission of the frames over a slow or lossy network path.
-
-The sending path on which (MP_)ACK frames are sent impacts the peer. The
-(MP_)ACK frame is notably used to determine the latency of a combination of
-uniflows. In particular, the peer can compute the round-trip-time of the
-combination of its sending uniflow with its receive one. The peer would compute
-the latency as the sum of the forward delay of the acknowledged uniflow and the
-return delay of the uniflow used to send the (MP_)ACK frame. Choosing between
-acknowledging packets symmetrically (on uniflow B to A if packet was sent on A
-to B) or not is up to the implementation, if only possible. However, hosts
-SHOULD keep a consistent acknowledgment strategy. Selecting a random uniflow to
-acknowledge packets may affect the performance of the connection. Notice that
-the inclusion of a timestamp field in the (MP_)ACK frame, as proposed by
-{{I-D.huitema-quic-1wd}}, may help hosts estimate more precisely the one-way
-delay of each uniflow, therefore leading to improved scheduling decisions.
-Unlike MAX_DATA and MAX_STREAM_DATA, (MP_)ACK frames SHOULD NOT be
-systematically duplicated on several sending uniflows as they can induce a large
-network overhead.
-
-
 Change Log
 ==========
+
+Since draft-deconinck-quic-multipath-05
+---------------------------------------
+
+- Update text to match draft-ietf-quic-transport-32
+- Link to scheduling companion draft
+- Remove dangling TODOs
 
 Since draft-deconinck-quic-multipath-04
 ---------------------------------------
