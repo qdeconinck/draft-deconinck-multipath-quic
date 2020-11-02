@@ -510,9 +510,9 @@ transport parameters, setting different upper bounds to the
 sending and receiving uniflows of each host.
 
 Hosts initiate the creation of their receiving uniflows by sending
-MP_NEW_CONNECTION_ID frames (see {{mpnewconnectionidsec}}) which are an extended
-version of the NEW_CONNECTION_ID frame. This frame associates a UCID to a
-uniflow. Upon reception of the MP_NEW_CONNECTION_ID frame, a host can start
+MP_NEW_CONNECTION_ID frames (see {{frame-mp-new-connection-id}}) which are an
+extended version of the NEW_CONNECTION_ID frame. This frame associates a UCID to
+a uniflow. Upon reception of the MP_NEW_CONNECTION_ID frame, a host can start
 using the proposed sending uniflow having the referenced Uniflow ID by marking
 sent packets with the provided UCID. Therefore, once a host sends a
 MP_NEW_CONNECTION_ID frame, it announces that it is ready to receive packets
@@ -944,12 +944,30 @@ New Frames
 ==========
 
 To support the multipath operations, new frames have been defined to coordinate
-hosts. All frames defined in this document MUST be exchanged in 1-RTT packets.
-A host receiving one of the following frames in other encryption context MUST
-close the connection with a PROTOCOL_VIOLATION error.
+hosts. The following table summarizes the added frames.
+
+| Type Value  | Frame Type Name         | Definition                        | Pkts | Spec |
+|:------------|:------------------------|:----------------------------------|:-----|:-----|
+| 0x40        | MP_NEW_CONNECTION_ID    | {{frame-mp-new-connection-id}}    | ___1 | P    |
+| 0x41        | MP_RETIRE_CONNECTION_ID | {{frame-mp-retire-connection-id}} | ___1 |      |
+| 0x42 - 0x43 | MP_ACK                  | {{frame-mp-ack}}                  | ___1 | NC   |
+| 0x44        | ADD_ADDRESS             | {{frame-add-address}}             | ___1 |      |
+| 0x45        | REMOVE_ADDRESS          | {{frame-remove-address}}          | ___1 |      |
+| 0x46        | UNIFLOWS                | {{frame-uniflows}}                | ___1 |      |
+{: #mp-frame-types title="Multipath-related Frame Types"}
+
+{{mp-frame-types}} uses the same notation convention as the Table 3 of
+{{I-D.ietf-quic-transport}} for the Pkts and Spec columns. In particular, all
+frames defined in this document MUST be exchanged in 1-RTT packets. A host
+receiving one of the multipath-related frames in other encryption context MUST
+close the connection with a PROTOCOL_VIOLATION error. All the frames are
+ack-eliciting except the MP_ACK frame. The MP_ACK frame does not count towards
+bytes in flight if the packet containing it only carries either ACK or MP_ACK
+frames. The MP_NEW_CONNECTION_ID frame is the only new frame that can be sent
+to probe new network paths.
 
 
-MP_NEW_CONNECTION_ID Frame {#mpnewconnectionidsec}
+MP_NEW_CONNECTION_ID Frame {#frame-mp-new-connection-id}
 --------------------------
 
 The MP_NEW_CONNECTION_ID frame (type=0x40) is an extension of the
@@ -998,7 +1016,7 @@ The generation of Connection ID MUST follow the same considerations as presented
 in Section 5.1 of {{I-D.ietf-quic-transport}}.
 
 
-MP_RETIRE_CONNECTION_ID Frame
+MP_RETIRE_CONNECTION_ID Frame {#frame-mp-retire-connection-id}
 -----------------------------
 
 The MP_RETIRE_CONNECTION_ID frame (type=0x41) is an extension of the
@@ -1023,7 +1041,7 @@ The frame is handled as described in {{I-D.ietf-quic-transport}} on an uniflow
 basis.
 
 
-MP_ACK Frame
+MP_ACK Frame {#frame-mp-ack}
 ------------
 
 The MP_ACK frame (types 0x42 and 0x43) is an extension of the ACK frame defined
@@ -1058,7 +1076,7 @@ Uniflow ID field indicating to which uniflow the acknowledged packet sequence
 numbers relate.
 
 
-ADD_ADDRESS Frame
+ADD_ADDRESS Frame {#frame-add-address}
 -----------------
 
 The ADD_ADDRESS frame (type=0x44) is used by a host to advertise its currently
@@ -1141,7 +1159,7 @@ reachable addresses. Link-local and possibly private addresses SHOULD NOT be
 exchanged.
 
 
-REMOVE_ADDRESS Frame
+REMOVE_ADDRESS Frame {#frame-remove-address}
 --------------------
 
 The REMOVE_ADDRESS frame (type=0x45) is used by a host to signal that a
@@ -1180,7 +1198,7 @@ in the UNUSED state. If the REMOVE_ADDRESS contains an Address ID that was not
 previously announced, the receiver MUST silently ignore the frame.
 
 
-UNIFLOWS Frame
+UNIFLOWS Frame {#frame-uniflows}
 --------------
 
 The UNIFLOWS frame (type=0x46) communicates the uniflows' state of the sending
