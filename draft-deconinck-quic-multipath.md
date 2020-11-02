@@ -38,12 +38,10 @@ informative:
   I-D.huitema-quic-mpath-req:
   I-D.bonaventure-iccrg-schedulers:
   RFC0793:
-  RFC6356:
-  RFC6824:
-  RFC7050:
-  RFC7225:
-  RFC8041:
   RFC3077:
+  RFC6356:
+  RFC8041:
+  RFC8684:
   MPRTP:
      title: "MPRTP: Multipath considerations for real-time media"
      date: "2013"
@@ -124,8 +122,8 @@ Today's endhosts are equipped with several
 network interfaces. Users expect to be able to seamlessly switch
 from one interface to another one or use them simultaneously to aggregate
 bandwidth whenever needed. During the last years, several multipath extensions
-to transport protocols have been proposed (e.g., {{RFC6824}}, {{MPRTP}}, or
-{{SCTPCMT}}). Multipath TCP {{RFC6824}} is the most mature one. It is already
+to transport protocols have been proposed (e.g., {{RFC8684}}, {{MPRTP}}, or
+{{SCTPCMT}}). Multipath TCP {{RFC8684}} is the most mature one. It is already
 deployed on popular smartphones, but also for other use cases {{RFC8041}}
 {{IETFJ}}.
 
@@ -1367,7 +1365,7 @@ project funded by the Walloon Government.
 Comparison with Multipath TCP
 =============================
 
-Multipath TCP {{RFC6824}} is currently the most widely deployed multipath
+Multipath TCP {{RFC8684}} is currently the most widely deployed multipath
 transport protocol on the Internet. While its design impacted the initial
 versions of the Multipath extensions for the QUIC protocol, there are now major
 differences between both protocols that we now highlight.
@@ -1375,37 +1373,108 @@ differences between both protocols that we now highlight.
 Multipath TCP Bidirectional Paths vs. QUIC Uniflows
 ---------------------------------------------------
 
-The notion of bidirectional paths, i.e., paths where packets flow in both
-directions, became a de facto standard with TCP. The Multipath TCP extension
-{{RFC6824}} combines several TCP connections to spread a single data stream
-over them. Hence, all the paths of a Multipath TCP connection must be
-bidirectional. However, networking experiences showed that packets following
-a direction do not always share the exact same road as the packets in the
-opposite direction. Furthermore, QUIC does not require a network path to be
-bidirectional in order to be used.
+TCP ensures reliable data delivery by sending back acknowledgments to the data
+sender. Because data flows in one direction and acknowledgments in the other,
+the notion of bidirectional paths became a de facto standard with TCP. The
+Multipath TCP extension {{RFC8684}} combines several TCP connections to spread
+a single data stream over them. Hence, all the paths of a Multipath TCP
+connection must be bidirectional. However, networking experiences showed that
+packets following a direction do not always share the exact same road as the
+packets in the opposite direction. Furthermore, QUIC does not require a network
+path to be bidirectional in order to be used, as many parts of its design handle
+possible network asymmetries (unidirectional Connection IDs, PATH_RESPONSE that
+can flow on a different network path than the elliciting PATH_CHALLENGE,...).
+
+
+Negotiating the Multipath Extensions
+------------------------------------
+
+A Multipath TCP connection relies on the TCP option field of the TCP header
+to negotiate the multipath extensions. During the handshake, Multipath TCP uses
+the MP_CAPABLE TCP option to exchange connection's keys used to authenticate
+additional Multipath TCP subflows and generate tokens used to identify the
+connection. However, TCP options are sent in clear-text. Any on-path network
+observer may record the connection's keys and create Multipath TCP subflows on
+it. Multipath QUIC does not face this security issue. The multipath extensions
+are negotiated using authenticated transport parameters of the QUIC handshake.
+Then, Multipath QUIC leverages the encryption feature of QUIC to hide
+information from network observers.
+
 
 Uniflow Establishment
 ---------------------
 
-Unlike Multipath TCP {{RFC6824}}, both hosts dynamically control how many
-sending uniflows can currently be in use by the peer.
+To create additional subflows to a Multipath TCP connection, hosts initiate a
+TCP handshake by negotitating the MP_JOIN TCP option. This option carries a
+token matching the TCP subflow to a Multipath TCP connection and a HMAC value
+computed using the exchanged connection's keys. In addition that connection's
+keys were exchanged in clear-text during the handshake and that the token is
+also in clear-text, the HMAC value (using SHA-256) is truncated to the leftmost
+64 bits (in SYN/ACK) or 160 bits (in third ACK) because of the TCP option
+length limitation to 40 bytes. Multipath QUIC avoids all these issues. The
+negotiation and usage of additional uniflows are performed using encrypted
+messages and the length of frames are only limited by the size of the packet
+that carries them.
+
+Another difference comes in the control of the number of paths/uniflows in use.
+Multipath TCP has a new subflow when the corresponding TCP handshake succeeds.
+However, it is not possible to restrict in advance the number of paths that a
+Multipath TCP connection can use. Therefore, the only way for a server to
+control the number of paths is to adopt a reactive approach, i.e., to reset or
+blackhole exceeding subflows from the client. In Multipath QUIC, each host sets
+a upper limit on the number of sending uniflows that it wants to use, while
+keeping control on the number of sending uniflows it provides to its peer. This
+path management is hence proactive.
 
 
 Exchanging Data over Multiple Uniflows
 --------------------------------------
 
-The uniflow on which data is sent is a packet-level information. This means that
+One of the key design decision of Multipath TCP is that all its subflows have
+to behave like regular TCP connections to handle network interference. Each
+Multipath TCP subflow has to keep in-sequence data delivery and dedicates its
+TCP sequence number to this end. To handle multipath reordering, an additional
+Data Sequence Number at the Multipath TCP level is needed. In Multipath QUIC,
+the uniflow on which data is sent is a packet-level information. This means that
 a frame can be sent regardless of the uniflow of the packet carrying it.
-Furthermore, because the data offset is a frame-level information, there is no
-need to define additional sequence numbers to cope with reordering across
-uniflows, unlike Multipath TCP {{RFC6824}} that uses a Data Sequence Number at
-the Multipath TCP level.
+Furthermore, because the (STREAM) data offset is a frame-level information,
+there is no need to define additional sequence numbers to cope with reordering
+across uniflows.
 
-Decoupling the network paths of data with their acknowledgment can be useful
-to limit the latency due to (MP_)ACK transmissions on high-latency network
-paths and to enable the usage of unidirectional networks. Such scheduling
-decision would not have been possible in Multipath TCP {{RFC6824}} which must
-acknowledge data on the (bidirectional) path it was received on.
+In addition to this signaling overhead, Multipath TCP faces performance issues
+due to this acknoweldgment constraint. Consider the following scenario. Some
+data was first transmitted on a lossy path A, such that the peer never receives
+it. The sender can (successfully) retransmit the same data over a working path B
+(and gets the corresponding acknowledgment). However, the sender cannot send new
+data on the path A as long as the initial lost data was not delivered on that
+path (because of the TCP behavior constraint). Such transmission overhead is not
+present in Multipath QUIC, as there is no rule that a Multipath QUIC uniflow has
+to behave like a single-path QUIC one.
+
+Another consequence of the "Multipath TCP subflows must behave like regular TCP
+connections" is that acknowkedgments have to stay on the same network path as
+the one used by the data. This constraint on the acknowledgment strategy is not
+present (and hardly enforceable) in Multipath QUIC as frames are independent of
+packets. Multipath QUIC can better benefit from high-latency paths and enable
+the usage of unidirectional networks.
+
+
+Advertising Host's Addresses
+----------------------------
+
+Multipath TCP enables host to communicate their local IP addresses to its peer
+by using the ADD_ADDR TCP option. Similarly, REMOVE_ADDR TCP option is used to
+advertise the loss of a local address to its peer. Their usage is however
+subject to security issues, as these options are communicated in clear-text,
+possibly leaking the host's IP addresses to the network. This security concern
+does not affect Multipath QUIC as all this information is encrypted in frames.
+
+Another point is related to the reliability of the address advertisement. In
+Multipath TCP, the ADD_ADDR and REMOVE_ADDR options are sent unreliably, i.e.,
+there is no acknowledgment mechanism for their reception. While Multipath TCP
+{{RFC8684}} provides an "echo" mechanism to the ADD_ADDR, there is no such
+equivalent for REMOVE_ADDR. In Multipath QUIC, ADD_ADDRESS and REMOVE_ADDRESS
+frames are ack-elliciting, making them reliable.
 
 
 Congestion Control
@@ -1415,14 +1484,6 @@ Multipath TCP uses the LIA congestion control scheme specified in {{RFC6356}}.
 This scheme can immediately be adapted to Multipath QUIC. Other coupled
 congestion control schemes have been proposed for Multipath TCP such as
 {{OLIA}}.
-
-
-ACK Frame
----------
-
-Since frames are independent of packets, and the uniflow notion relates to the
-packets, the (MP_)ACK frames can be sent on any uniflow, unlike Multipath TCP
-{{RFC6824}} which is constrained to send ACKs on the same path.
 
 
 Change Log
